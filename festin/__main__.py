@@ -152,14 +152,15 @@ async def analyze(cli_args: argparse.Namespace,
         #
         # Get web links?
         #
-        if cli_args.links:
+        if not cli_args.no_links:
             await get_links(cli_args, domain, cli_args.debug, queue)
 
         #
         # Get cnames
         #
         # if cli_args.dns:
-        await get_dns_info(cli_args, domain, cli_args.debug, queue)
+        if not cli_args.no_dns:
+            await get_dns_info(cli_args, domain, cli_args.debug, queue)
 
     except Exception as e:
         print(e)
@@ -217,6 +218,9 @@ def show_results(buckets: List[S3Bucket]):
         print(f"    > Domain '{r.domain}' - Found {len(r.objects)} "
               f"public objects")
 
+        for obj in r.objects:
+            print(f"      -> {r.domain}/{obj}")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -228,10 +232,14 @@ def main():
     parser.add_argument("-f", "--file-domains",
                         default=None,
                         help="file with domains")
-    parser.add_argument("--links",
-                        action="store_true",
-                        default=False,
+    parser.add_argument("--no-links",
+                        action="store_false",
+                        default=True,
                         help="extract web site links")
+    parser.add_argument("--no-dns",
+                        action="store_false",
+                        default=True,
+                        help="follow dns cnames")
     parser.add_argument("--index",
                         default=None,
                         action="store_true",
@@ -244,6 +252,10 @@ def main():
                         default=None,
                         action="store_true",
                         help="Use Tor as proxy")
+    parser.add_argument("--no-print",
+                        default=False,
+                        action="store_true",
+                        help="doesn't print results in screen")
     parser.add_argument("-q", "--quiet",
                         default=False,
                         action="store_true",
@@ -272,7 +284,7 @@ def main():
 
     buckets_found = asyncio.run(analyze_domains(parsed, domains))
 
-    if not parsed.quiet:
+    if not parsed.no_print:
         print("[*] Bucket found:")
         show_results(buckets_found)
 
