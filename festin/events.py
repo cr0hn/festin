@@ -28,7 +28,7 @@ async def on_result_print_results(cli_args, bucket):
 
 
 async def on_result_save_streaming_results(cli_args, bucket):
-    async with aiofiles.open(cli_args.discovered_domains, mode='a+') as f:
+    async with aiofiles.open(cli_args.result_file, mode='a+') as f:
         await f.write(f"{json.dumps(bucket.__dict__)}\n")
 
 
@@ -53,7 +53,7 @@ async def on_results_add_to_redis(
 async def on_domain_event(cli_args,
                           domain_queue: asyncio.Queue,
                           consumers: List):
-    while not domain_queue.empty():
+    while True:
 
         domain = await domain_queue.get()
 

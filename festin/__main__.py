@@ -167,6 +167,9 @@ async def run(cli_args: argparse.Namespace, init_domains: list):
     if cli_args.index:
         on_results_tasks.append(on_results_add_to_redis)
 
+    if cli_args.result_file:
+        on_results_tasks.append(on_result_save_streaming_results)
+
     if not cli_args.no_print or not cli_args.quiet:
         on_results_tasks.append(on_result_print_results)
 
@@ -185,6 +188,9 @@ async def run(cli_args: argparse.Namespace, init_domains: list):
 
     wait_tasks.append(asyncio.create_task(
         on_result_event(cli_args, results_queue, on_results_tasks)
+    ))
+    wait_tasks.append(asyncio.create_task(
+        on_domain_event(cli_args, discovered_domains, on_domain_tasks)
     ))
 
     # Launch watcher
@@ -240,12 +246,9 @@ def main():
                         help="max concurrency")
 
     group_results = parser.add_argument_group('Results')
-    group_results.add_argument("-rr", "--realtime-result-file",
+    group_results.add_argument("-rr", "--result-file",
                                default=None,
-                               help="result file for 'watch' mode")
-    group_results.add_argument("-ro", "--simple-results-file",
-                               default=None,
-                               help="result file name")
+                               help="results file")
     group_results.add_argument("-rd", "--discovered-domains",
                                default=None,
                                help="file name for storing new discovered "
