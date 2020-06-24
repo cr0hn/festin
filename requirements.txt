@@ -1,5 +1,6 @@
 lxml
 
+aiofiles
 aioredis
 watchgod
 async_dns
