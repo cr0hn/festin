@@ -1,196 +1,91 @@
 import asyncio
 import argparse
+import re
 
-from typing import List
-from functools import partial
-from urllib.parse import urlparse
+from typing import List, Set
 
-import aiohttp
+import aiofiles
 
-from lxml import etree
-from async_dns.core import types
-from async_dns.resolver import ProxyResolver
-from aiohttp_proxy import ProxyConnector, ProxyType
+from watchgod import awatch
 
 from festin import *
 
 
-def build_tor_connector(cli_args: argparse.Namespace) \
-        -> ProxyConnector or None:
-
-    if cli_args.tor:
-        return ProxyConnector(
-            proxy_type=ProxyType.SOCKS5,
-            host='127.0.0.1',
-            port=9050,
-            verify_ssl=False
-        )
-    else:
-        return None
-
-async def get_links(cli_args: argparse.Namespace,
-                    domain: str,
-                    debug: bool,
-                    queue: asyncio.Queue):
-    # Get links
-    found_domains = set()
-
-    for scheme in ("http", "https"):
-        try:
-            async with aiohttp.ClientSession(connector=build_tor_connector(
-                    cli_args)
-            ) as session:
-
-                async with session.get(f"{scheme}://{domain}",
-                                       verify_ssl=False) as response:
-                    content = await response.text()
-
-                    if "html" not in response.headers.get("Content-Type", ""):
-                        continue
-
-                    if hasattr(content, "encode"):
-                        content = content.encode("UTF-8")
-
-                    tree = etree.HTML(content)
-
-                    for res in list(tree.xpath(".//@src") + tree.xpath(".//@src")):
-                        if loc := urlparse(res).netloc:
-                            found_domains.add(loc)
-
-        except Exception as e:
-            print(e)
-            continue
-
-    if debug:
-        print(f"      - Found '{len(found_domains)}' new "
-              f"domains in site links ")
-
-    for d in found_domains:
-        if debug:
-            print(f"        +> Adding '{d}'")
-
-        await queue.put(d)
-
-
-async def get_dns_info(cli_args: argparse.Namespace,
-                       domain: str,
-                       debug: bool,
-                       queue: asyncio.Queue):
-    resolver = ProxyResolver()
-
-    try:
-        cname_response = await resolver.query(domain, types.CNAME)
-    except Exception as e:
-        print(e)
-        return
-
-    for resp in cname_response.an:
-        if resp.data:
-            print(f"        +> New CNAME '{resp.data}'")
-            await queue.put(resp.data)
-
-
-async def get_s3(cli_args: argparse.Namespace,
-                 domain: str,
-                 debug: bool,
-                 queue: asyncio.Queue,
-                 results: list):
-    try:
-        async with aiohttp.ClientSession(connector=build_tor_connector(
-                cli_args)) as session:
-
-            if domain.endswith("s3.amazonaws.com"):
-                bucket_name = domain
-            elif "s3" in domain:
-                _s = domain.find("s3")# Another S3 provider
-                provider = domain[_s:]
-                domain = domain[:_s - 1]
-                bucket_name = f"http://{provider}/{domain}"
-            else:
-                bucket_name = BASE_URL.format(domain=domain)
-
-            async with session.get(bucket_name) as response:
-
-                if str(response.status).startswith("2"):
-                    content = await response.text()
-
-                    if objects := parse_result(content):
-                        results.append(S3Bucket(
-                            domain=domain,
-                            bucket_name=bucket_name,
-                            objects=[path for path in objects]
-                        ))
-
-                elif response.status == 301:
-                    redirection_url = get_redirection(await response.read())
-
-                    if debug:
-                        print(
-                            f"  >> Redirection '{domain}' --> "
-                            f"{redirection_url}",
-                            flush=True)
-
-                    await queue.put(redirection_url)
-
-    except Exception as e:
-        print(e)
-
-
 async def analyze(cli_args: argparse.Namespace,
                   domain: str,
-                  results: list,
+                  results_queue: asyncio.Queue,
                   sem: asyncio.Semaphore,
-                  queue: asyncio.Queue):
+                  input_domains_queue: asyncio.Queue):
     print(f"    > Processing '{domain}'", flush=True)
 
     try:
         #
         # Getting info from AWS
         #
-        await get_s3(cli_args, domain, cli_args.debug, queue, results)
+        await get_s3(cli_args,
+                     domain,
+                     cli_args.debug,
+                     input_domains_queue,
+                     results_queue)
 
         #
         # Get web links?
         #
         if not cli_args.no_links:
-            await get_links(cli_args, domain, cli_args.debug, queue)
+            await get_links(cli_args,
+                            domain,
+                            cli_args.debug,
+                            input_domains_queue)
 
         #
         # Get cnames
         #
         # if cli_args.dns:
-        if not cli_args.no_dns:
-            await get_dns_info(cli_args, domain, cli_args.debug, queue)
+        if not cli_args.no_dnsdiscover:
+            await get_dns_info(cli_args,
+                               domain,
+                               cli_args.debug,
+                               input_domains_queue)
 
     except Exception as e:
         print(e)
     finally:
         sem.release()
-        queue.task_done()
+        input_domains_queue.task_done()
 
 
-async def analyze_domains(cli_args: argparse.Namespace, domains: List[str]):
+async def analyze_domains(cli_args: argparse.Namespace,
+                          processed_domains: Set[str],
+                          results_queue: asyncio.Queue or None = None,
+                          input_domains_queue: asyncio.Queue or None = None):
 
     concurrency = cli_args.concurrency
+    domain_regex = cli_args.domain_regex
 
     tasks = []
-    results = []
-    queue_domains = asyncio.Queue()
+
+    input_queue_domains = input_domains_queue or asyncio.Queue()
     sem = asyncio.Semaphore(value=concurrency)
 
-    for d in domains:
-        queue_domains.put_nowait(d)
+    while not input_queue_domains.empty():
+        domain = await input_queue_domains.get()
 
-    while not queue_domains.empty():
-        domain = await queue_domains.get()
+        if domain in processed_domains:
+            continue
+
+        processed_domains.add(domain)
+
+        if domain_regex:
+            if not domain_regex.match(domain):
+                continue
 
         tasks.append(
             asyncio.create_task(analyze(
                 cli_args,
                 domain,
-                results,
+                results_queue,
                 sem,
-                queue_domains
+                input_queue_domains
             ))
         )
 
@@ -198,29 +93,82 @@ async def analyze_domains(cli_args: argparse.Namespace, domains: List[str]):
 
     await asyncio.gather(*tasks)
 
-    return results
+
+async def one_shot_run(cli_args: argparse.Namespace, domains: List[str]):
+    def show_results_no_watch(buckets: asyncio.Queue):
+
+        if buckets.empty():
+            print("    *> No public content found")
+        else:
+            while not buckets.empty():
+
+                bucket = buckets.get_nowait()
+
+                print(f"    *> '{bucket.domain}' - Found {len(bucket.objects)}"
+                      f"public objects")
+
+                for obj in bucket.objects:
+                    print(f"        -> {bucket.domain}/{obj}")
+
+    domains_processed = set()
+    input_domain_queue = asyncio.Queue()
+    output_domain_queue = asyncio.Queue()
+
+    for d in domains:
+        input_domain_queue.put_nowait(d)
+
+    await analyze_domains(
+        cli_args,
+        domains_processed,
+        output_domain_queue,
+        input_domain_queue
+    )
+
+    if not cli_args.no_print or not cli_args.quiet:
+        show_results_no_watch(output_domain_queue)
+
+    if cli_args.index:
+        if not cli_args.quiet:
+            print("[*] Indexing Buckets content")
+
+        await add_to_redis(cli_args, output_domain_queue, download_s3_objects)
 
 
-async def add_to_redis(cli_args: argparse.Namespace, buckets_found):
-    redis_con = await redis_create_connection(cli_args.index_server)
+async def run_watch(cli_args: argparse.Namespace, init_domains: list):
 
-    fulltext_add_fn = partial(redis_add_document, redis_con)
+    quiet = cli_args.quiet
+    domains_processed = set()
+    input_domain_queue = asyncio.Queue()
+    output_domain_queue = asyncio.Queue()
 
-    await download_s3_objects(buckets_found, fulltext_add_fn)
+    for d in init_domains:
+        input_domain_queue.put_nowait(d)
 
+    # Run first discover
+    await analyze_domains(
+        cli_args,
+        domains_processed,
+        output_domain_queue,
+        input_domain_queue
+    )
 
-# -------------------------------------------------------------------------
-# Utils
-# -------------------------------------------------------------------------
-def show_results(buckets: List[S3Bucket]):
-    # Show results
-    for r in buckets:
-        print(f"    > Domain '{r.domain}' - Found {len(r.objects)} "
-              f"public objects")
+    print("[*] Watching for new domains")
+    async for _ in awatch(cli_args.file_domains):
+        async with aiofiles.open(cli_args.file_domains, mode='r') as f:
+            file_content = await f.read()
 
-        for obj in r.objects:
-            print(f"      -> {r.domain}/{obj}")
+            clean_content_file = set(file_content.splitlines())
 
+            # Select only new domains
+            new_domains = clean_content_file.difference(domains_processed)
+
+            # Append new domains to processed domains and to the queue
+            domains_processed.update(new_domains)
+            for d in new_domains:
+                if not quiet:
+                    print(f"     > added for processing: '{d}'")
+
+                await input_domain_queue.put(d)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -236,34 +184,54 @@ def main():
                         action="store_false",
                         default=True,
                         help="extract web site links")
-    parser.add_argument("--no-dns",
-                        action="store_false",
-                        default=True,
-                        help="follow dns cnames")
-    parser.add_argument("--index",
-                        default=None,
+    parser.add_argument("-w", "--watch",
                         action="store_true",
-                        help="Download and index documents into Redis")
-    parser.add_argument("--index-server",
-                        default="redis://localhost:6379",
-                        help="Redis Search Server"
-                             "Default: redis://localhost:6379")
-    parser.add_argument("--tor",
-                        default=None,
-                        action="store_true",
-                        help="Use Tor as proxy")
-    parser.add_argument("--no-print",
                         default=False,
-                        action="store_true",
-                        help="doesn't print results in screen")
-    parser.add_argument("-q", "--quiet",
-                        default=False,
-                        action="store_true",
-                        help="Use quiet mode")
+                        help="watch for new domains in file domains '-f' "
+                             "option")
     parser.add_argument("-c", "--concurrency",
                         default=2,
                         type=int,
                         help="max concurrency")
+
+    group_conn = parser.add_argument_group('Connectivity')
+    group_conn.add_argument("--tor",
+                        default=None,
+                        action="store_true",
+                        help="Use Tor as proxy")
+
+    group_display = parser.add_argument_group('Display options')
+    group_display.add_argument("--no-print",
+                        default=False,
+                        action="store_true",
+                        help="doesn't print results in screen")
+    group_display.add_argument("-q", "--quiet",
+                        default=False,
+                        action="store_true",
+                        help="Use quiet mode")
+
+    group_redis = parser.add_argument_group('Redis Search')
+    group_redis.add_argument("--index",
+                             default=None,
+                             action="store_true",
+                             help="Download and index documents into Redis")
+    group_redis.add_argument("--index-server",
+                             default="redis://localhost:6379",
+                             help="Redis Search Server"
+                                  "Default: redis://localhost:6379")
+
+    group_dns = parser.add_argument_group('DNS options')
+    group_dns.add_argument("-dn", "--no-dnsdiscover",
+                           action="store_false",
+                           default=True,
+                           help="not follow dns cnames")
+    group_dns.add_argument("-dr", "--domain-regex",
+                           default=None,
+                           help="only follow domains that matches this regex")
+    group_dns.add_argument("-ds", "--dns-resolver",
+                           nargs="*",
+                           default=None,
+                           help="comma separated custom domain name servers")
 
     parsed = parser.parse_args()
 
@@ -276,21 +244,35 @@ def main():
         with open(parsed.file_domains, "r") as f:
             domains.extend(f.read().splitlines())
 
+    # Remove duplicates
+    domains = list(set(domains))
+
     if not domains:
         print("[!] You must provide at least one domain")
         exit(1)
 
-    print("[*] Starting analysis")
+    if parsed.domain_regex:
+        # Check regex
+        parsed.domain_regex = re.compile(parsed.domain_regex)
 
-    buckets_found = asyncio.run(analyze_domains(parsed, domains))
+    if not parsed.quiet:
+        print(LOGO)
 
-    if not parsed.no_print:
-        print("[*] Bucket found:")
-        show_results(buckets_found)
+    if parsed.watch:
+        if not parsed.file_domains:
+            print("[!] For running in 'Watch' mode you must set a domains "
+                  "file ('-f' option)")
+            exit(1)
 
-    if parsed.index:
-        print("[*] Indexing Buckets content")
-        asyncio.run(add_to_redis(parsed, buckets_found))
+        if not parsed.quiet:
+            print("[*] Starting FestIN")
+
+        asyncio.run(run_watch(parsed, domains))
+    else:
+
+        if not parsed.quiet:
+            print("[*] Starting FestIN")
+        asyncio.run(one_shot_run(parsed, domains))
 
 
 if __name__ == '__main__':

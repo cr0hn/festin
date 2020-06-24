@@ -7,8 +7,6 @@ from dataclasses import dataclass
 import aiohttp
 import filetype
 
-BASE_URL = "https://s3.amazonaws.com/{domain}"
-
 FILE_TYPES = [
     filetype.is_audio,
     filetype.is_font,
@@ -76,5 +74,5 @@ def parse_result(content: str or bytes) -> List[str]:
     return contents
 
 
-__all__ = ("BASE_URL", "parse_result", "S3Bucket", "get_redirection",
+__all__ = ("parse_result", "S3Bucket", "get_redirection",
            "download_s3_objects")

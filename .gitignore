@@ -455,7 +455,7 @@ paket-files/
 # OpenCover UI analysis results
 OpenCover/
 
-# Azure Stream Analytics local run output
+# Azure Stream Analytics local one_shot_run output
 ASALocalRun/
 
 # MSBuild Binary and Structured Log
