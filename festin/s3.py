@@ -45,18 +45,17 @@ async def download_content_and_index(
                 await fulltext_add_fn(bucket_name, url, content)
 
 
-async def download_s3_objects(buckets: List[S3Bucket], fulltext_add_fn):
+async def download_s3_objects(bucket: S3Bucket, fulltext_add_fn):
     sem = asyncio.Semaphore(20)
 
-    for bucket in buckets:
-        await asyncio.gather(*[
-            download_content_and_index(
-                url,
-                bucket.bucket_name,
-                sem,
-                fulltext_add_fn
-            ) for url in bucket.objects
-        ])
+    await asyncio.gather(*[
+        download_content_and_index(
+            url,
+            bucket.bucket_name,
+            sem,
+            fulltext_add_fn
+        ) for url in bucket.objects
+    ])
 
 
 def parse_result(content: str or bytes) -> List[str]:

@@ -63,15 +63,7 @@ async def redis_add_document(connection,
 
 
 
-async def add_to_redis(cli_args: argparse.Namespace,
-                       buckets_found,
-                       download_fn):
-    redis_con = await redis_create_connection(cli_args.index_server)
-
-    fulltext_add_fn = partial(redis_add_document, redis_con)
-
-    await download_fn(buckets_found, fulltext_add_fn)
 
 
 
-__all__ = ("redis_add_document", "redis_create_connection", "add_to_redis")
+__all__ = ("redis_add_document", "redis_create_connection")

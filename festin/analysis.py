@@ -1,5 +1,7 @@
 import asyncio
 import argparse
+from collections import Callable
+from typing import List
 
 from urllib.parse import urlparse
 
@@ -28,8 +30,9 @@ def build_tor_connector(cli_args: argparse.Namespace) \
 
 async def get_links(cli_args: argparse.Namespace,
                     domain: str,
-                    debug: bool,
                     input_queue: asyncio.Queue):
+    quiet = cli_args.quiet
+
     # Get links
     found_domains = set()
 
@@ -59,20 +62,19 @@ async def get_links(cli_args: argparse.Namespace,
             print(e)
             continue
 
-    if debug:
-        print(f"      - Found '{len(found_domains)}' new "
-              f"domains in site links ")
+    if not quiet and found_domains:
+        print(f"    > Found '{len(found_domains)}' new "
+              f"domains from website links ", flush=True)
 
     for d in found_domains:
-        if debug:
-            print(f"        +> Adding '{d}'")
+        if not quiet:
+            print(f"      -> Adding domain from link '{d}'", flush=True)
 
         await input_queue.put(d)
 
 
 async def get_dns_info(cli_args: argparse.Namespace,
                        domain: str,
-                       debug: bool,
                        input_queue: asyncio.Queue):
 
     if cli_args.dns_resolver:
@@ -90,15 +92,17 @@ async def get_dns_info(cli_args: argparse.Namespace,
 
     for resp in cname_response.an:
         if resp.data:
-            print(f"        +> New CNAME '{resp.data}'")
+            print(f"        +> Found new CNAME '{resp.data}'", flush=True)
             await input_queue.put(resp.data)
 
 
 async def get_s3(cli_args: argparse.Namespace,
                  domain: str,
-                 debug: bool,
                  input_queue: asyncio.Queue,
                  results_queue: asyncio.Queue):
+
+    quiet = cli_args.quiet
+
     try:
         async with aiohttp.ClientSession(connector=build_tor_connector(
                 cli_args)) as session:
@@ -106,7 +110,7 @@ async def get_s3(cli_args: argparse.Namespace,
             if domain.endswith("s3.amazonaws.com"):
                 bucket_name = domain
             elif "s3" in domain:
-                _s = domain.find("s3")# Another S3 provider
+                _s = domain.find("s3")  # Another S3 provider
                 provider = domain[_s:]
                 domain = domain[:_s - 1]
                 bucket_name = f"http://{provider}/{domain}"
@@ -130,15 +134,16 @@ async def get_s3(cli_args: argparse.Namespace,
                 elif response.status == 301:
                     redirection_url = get_redirection(await response.read())
 
-                    if debug:
+                    if quiet:
                         print(
-                            f"  >> Redirection '{domain}' --> "
-                            f"{redirection_url}",
+                            f"  >> Found a redirection for bucket '{domain}' "
+                            f"-> {redirection_url}",
                             flush=True)
 
                     await input_queue.put(redirection_url)
 
     except Exception as e:
         print(e)
+
 
 __all__ = ("get_s3", "get_dns_info", "get_links")

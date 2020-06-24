@@ -1,14 +1,17 @@
 import asyncio
 import argparse
+import json
 import re
+from functools import partial
 
-from typing import List, Set
+from typing import List, Set, Callable
 
 import aiofiles
 
 from watchgod import awatch
 
 from festin import *
+from festin.events import *
 
 
 async def analyze(cli_args: argparse.Namespace,
@@ -16,6 +19,7 @@ async def analyze(cli_args: argparse.Namespace,
                   results_queue: asyncio.Queue,
                   sem: asyncio.Semaphore,
                   input_domains_queue: asyncio.Queue):
+
     print(f"    > Processing '{domain}'", flush=True)
 
     try:
@@ -24,19 +28,25 @@ async def analyze(cli_args: argparse.Namespace,
         #
         await get_s3(cli_args,
                      domain,
-                     cli_args.debug,
                      input_domains_queue,
                      results_queue)
 
+    except Exception as e:
+        print(e)
+
+    try:
         #
         # Get web links?
         #
         if not cli_args.no_links:
             await get_links(cli_args,
                             domain,
-                            cli_args.debug,
                             input_domains_queue)
 
+    except Exception as e:
+        print(e)
+
+    try:
         #
         # Get cnames
         #
@@ -44,11 +54,11 @@ async def analyze(cli_args: argparse.Namespace,
         if not cli_args.no_dnsdiscover:
             await get_dns_info(cli_args,
                                domain,
-                               cli_args.debug,
                                input_domains_queue)
 
     except Exception as e:
         print(e)
+
     finally:
         sem.release()
         input_domains_queue.task_done()
@@ -56,24 +66,39 @@ async def analyze(cli_args: argparse.Namespace,
 
 async def analyze_domains(cli_args: argparse.Namespace,
                           processed_domains: Set[str],
-                          results_queue: asyncio.Queue or None = None,
-                          input_domains_queue: asyncio.Queue or None = None):
+                          results_queue: asyncio.Queue,
+                          input_queue_domains: asyncio.Queue,
+                          discovered_domains: asyncio.Queue):
 
     concurrency = cli_args.concurrency
     domain_regex = cli_args.domain_regex
 
     tasks = []
 
-    input_queue_domains = input_domains_queue or asyncio.Queue()
     sem = asyncio.Semaphore(value=concurrency)
 
-    while not input_queue_domains.empty():
-        domain = await input_queue_domains.get()
+    while True:
 
-        if domain in processed_domains:
+        try:
+            domain: str = await asyncio.wait_for(input_queue_domains.get(), 5)
+        except asyncio.exceptions.TimeoutError:
+            if all(t.done() for t in tasks) and input_queue_domains.empty():
+                return
+            else:
+                continue
+
+        if not domain or domain in processed_domains:
+            continue
+
+        if any(domain.endswith(d) for d in BLACK_LIST_TLD):
+            continue
+
+        if domain in BLACK_LIST_DOMAINS:
             continue
 
         processed_domains.add(domain)
+
+        await discovered_domains.put(domain)
 
         if domain_regex:
             if not domain_regex.match(domain):
@@ -91,84 +116,104 @@ async def analyze_domains(cli_args: argparse.Namespace,
 
         await sem.acquire()
 
+        # if all(t.done() for t in tasks) and input_queue_domains.empty():
+        #     break
+
     await asyncio.gather(*tasks)
 
 
-async def one_shot_run(cli_args: argparse.Namespace, domains: List[str]):
-    def show_results_no_watch(buckets: asyncio.Queue):
+async def run(cli_args: argparse.Namespace, init_domains: list):
 
-        if buckets.empty():
-            print("    *> No public content found")
-        else:
-            while not buckets.empty():
+    async def watch_new_domains():
 
-                bucket = buckets.get_nowait()
+        print("[*] Watching for new domains")
+        async for _ in awatch(cli_args.file_domains):
+            async with aiofiles.open(cli_args.file_domains, mode='r') as f:
+                file_content = await f.read()
 
-                print(f"    *> '{bucket.domain}' - Found {len(bucket.objects)}"
-                      f"public objects")
+                clean_content_file = set(file_content.splitlines())
 
-                for obj in bucket.objects:
-                    print(f"        -> {bucket.domain}/{obj}")
+                # Select only new domains
+                new_domains = clean_content_file.difference(domains_processed)
 
-    domains_processed = set()
-    input_domain_queue = asyncio.Queue()
-    output_domain_queue = asyncio.Queue()
+                # Append new domains to processed domains and to the queue
+                # domains_processed.update(new_domains)
+                for d in new_domains:
+                    if not d:
+                        continue
 
-    for d in domains:
-        input_domain_queue.put_nowait(d)
+                    if not quiet:
+                        print(f"    > added for processing: '{d}'")
 
-    await analyze_domains(
-        cli_args,
-        domains_processed,
-        output_domain_queue,
-        input_domain_queue
-    )
-
-    if not cli_args.no_print or not cli_args.quiet:
-        show_results_no_watch(output_domain_queue)
-
-    if cli_args.index:
-        if not cli_args.quiet:
-            print("[*] Indexing Buckets content")
-
-        await add_to_redis(cli_args, output_domain_queue, download_s3_objects)
-
-
-async def run_watch(cli_args: argparse.Namespace, init_domains: list):
+                    await input_domain_queue.put(d)
 
     quiet = cli_args.quiet
     domains_processed = set()
     input_domain_queue = asyncio.Queue()
-    output_domain_queue = asyncio.Queue()
+    results_queue = asyncio.Queue()
+    discovered_domains = asyncio.Queue()
 
+    #
+    # Populate initial domains
+    #
     for d in init_domains:
         input_domain_queue.put_nowait(d)
 
-    # Run first discover
-    await analyze_domains(
-        cli_args,
-        domains_processed,
-        output_domain_queue,
-        input_domain_queue
-    )
+    #
+    # On results events
+    #
+    on_results_tasks = []
 
-    print("[*] Watching for new domains")
-    async for _ in awatch(cli_args.file_domains):
-        async with aiofiles.open(cli_args.file_domains, mode='r') as f:
-            file_content = await f.read()
+    if cli_args.index:
+        on_results_tasks.append(on_results_add_to_redis)
 
-            clean_content_file = set(file_content.splitlines())
+    if not cli_args.no_print or not cli_args.quiet:
+        on_results_tasks.append(on_result_print_results)
 
-            # Select only new domains
-            new_domains = clean_content_file.difference(domains_processed)
+    #
+    # On domain events
+    #
+    on_domain_tasks = []
 
-            # Append new domains to processed domains and to the queue
-            domains_processed.update(new_domains)
-            for d in new_domains:
-                if not quiet:
-                    print(f"     > added for processing: '{d}'")
+    if cli_args.discovered_domains:
+        on_domain_tasks.append(on_domain_save_new_domains)
 
-                await input_domain_queue.put(d)
+    #
+    # Launch services
+    #
+    wait_tasks = []
+
+    wait_tasks.append(asyncio.create_task(
+        on_result_event(cli_args, results_queue, on_results_tasks)
+    ))
+
+    # Launch watcher
+    if cli_args.watch:
+        wait_tasks.append(
+            asyncio.create_task(watch_new_domains())
+        )
+
+    #
+    # Run initial discover
+    #
+    try:
+        await analyze_domains(
+            cli_args,
+            domains_processed,
+            results_queue,
+            input_domain_queue,
+            discovered_domains
+        )
+    finally:
+        if not cli_args.watch:
+            await results_queue.put(STOP_KEYWORD)
+            await discovered_domains.put(STOP_KEYWORD)
+
+    #
+    # Wait for all tasks finish
+    #
+    await asyncio.wait(wait_tasks)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -182,7 +227,7 @@ def main():
                         help="file with domains")
     parser.add_argument("--no-links",
                         action="store_false",
-                        default=True,
+                        default=False,
                         help="extract web site links")
     parser.add_argument("-w", "--watch",
                         action="store_true",
@@ -194,21 +239,33 @@ def main():
                         type=int,
                         help="max concurrency")
 
+    group_results = parser.add_argument_group('Results')
+    group_results.add_argument("-rr", "--realtime-result-file",
+                               default=None,
+                               help="result file for 'watch' mode")
+    group_results.add_argument("-ro", "--simple-results-file",
+                               default=None,
+                               help="result file name")
+    group_results.add_argument("-rd", "--discovered-domains",
+                               default=None,
+                               help="file name for storing new discovered "
+                                    "domains")
+
     group_conn = parser.add_argument_group('Connectivity')
     group_conn.add_argument("--tor",
-                        default=None,
-                        action="store_true",
-                        help="Use Tor as proxy")
+                            default=None,
+                            action="store_true",
+                            help="Use Tor as proxy")
 
     group_display = parser.add_argument_group('Display options')
     group_display.add_argument("--no-print",
-                        default=False,
-                        action="store_true",
-                        help="doesn't print results in screen")
+                               default=False,
+                               action="store_true",
+                               help="doesn't print results in screen")
     group_display.add_argument("-q", "--quiet",
-                        default=False,
-                        action="store_true",
-                        help="Use quiet mode")
+                               default=False,
+                               action="store_true",
+                               help="Use quiet mode")
 
     group_redis = parser.add_argument_group('Redis Search')
     group_redis.add_argument("--index",
@@ -223,7 +280,7 @@ def main():
     group_dns = parser.add_argument_group('DNS options')
     group_dns.add_argument("-dn", "--no-dnsdiscover",
                            action="store_false",
-                           default=True,
+                           default=False,
                            help="not follow dns cnames")
     group_dns.add_argument("-dr", "--domain-regex",
                            default=None,
@@ -264,15 +321,10 @@ def main():
                   "file ('-f' option)")
             exit(1)
 
-        if not parsed.quiet:
-            print("[*] Starting FestIN")
+    if not parsed.quiet:
+        print("[*] Starting FestIN")
 
-        asyncio.run(run_watch(parsed, domains))
-    else:
-
-        if not parsed.quiet:
-            print("[*] Starting FestIN")
-        asyncio.run(one_shot_run(parsed, domains))
+        asyncio.run(run(parsed, domains))
 
 
 if __name__ == '__main__':
