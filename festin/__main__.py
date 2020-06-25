@@ -1,6 +1,7 @@
 import re
 import asyncio
 import argparse
+import platform
 
 from typing import Set
 
@@ -93,15 +94,20 @@ async def analyze_domains(cli_args: argparse.Namespace,
                     continue
 
         if not domain or domain in processed_domains:
+            print(f"      -> [SKIP] domain '{domain}' already processed")
             continue
 
         if any(domain.endswith(d) for d in BLACK_LIST_TLD):
+            print(f"      -> [SKIP] domain '{domain}' is in blacklist")
             continue
 
         if any(domain.startswith(d) for d in BLACK_LIST_PREFISES):
+            print(f"      -> [SKIP] domain '{domain}' has a prefix "
+                  f"blacklisted")
             continue
 
         if domain in BLACK_LIST_DOMAINS:
+            print(f"      -> [SKIP] domain '{domain}' is in blacklist")
             continue
 
         processed_domains.add(domain)
@@ -202,7 +208,10 @@ async def run(cli_args: argparse.Namespace, init_domains: list):
         on_result_event(cli_args, results_queue, on_results_tasks)
     ))
     wait_tasks.append(asyncio.create_task(
-        on_domain_event(cli_args, discovered_domains, on_domain_tasks)
+        on_domain_event(cli_args,
+                        discovered_domains,
+                        init_domains,
+                        on_domain_tasks)
     ))
 
     # Launch watcher
@@ -234,6 +243,17 @@ async def run(cli_args: argparse.Namespace, init_domains: list):
 
 
 def main():
+
+    #
+    # Check python version
+    #
+    if platform.python_version_tuple() < ("3", "8"):
+        print("\n[!] Python 3.8 or above is required\n")
+        print("If you don't want to install Python 3.8. "
+              "Try with Docker:\n")
+        print("   $ docker run --rm cr0hn/festin -h")
+        exit(1)
+
     parser = argparse.ArgumentParser(
         description='S3 Data Analyzer'
     )
