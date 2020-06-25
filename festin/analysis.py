@@ -195,11 +195,13 @@ async def get_dns_info(cli_args: argparse.Namespace,
     debug = cli_args.debug
 
     if cli_args.dns_resolver:
-        dns_servers =("*", cli_args.dns_resolver.split(","))
+        dns_servers =[(None, cli_args.dns_resolver.split(","))]
     else:
         dns_servers = None
-
-    resolver = ProxyResolver(proxies=dns_servers)
+    try:
+        resolver = ProxyResolver(proxies=dns_servers)
+    except Exception as e:
+        pass
 
     for _ in range(3):
         try:

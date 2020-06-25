@@ -6,8 +6,8 @@ import platform
 from typing import Set
 
 import aiofiles
-import colorama
 
+from colorama import Fore, Style
 from watchgod import awatch
 
 from festin import *
@@ -119,7 +119,7 @@ async def analyze_domains(cli_args: argparse.Namespace,
 
         if not domain or domain in processed_domains:
             print(
-                f"[SKIP] domain '{domain}' already processed")
+                f"[{Fore.YELLOW}SKIP{Style.RESET_ALL}] domain '{domain}' already processed")
             continue
 
         processed_domains.add(domain)
@@ -401,7 +401,10 @@ def main():
     if not parsed.quiet:
         print("[*] Starting FestIN")
 
-        asyncio.run(run(parsed, domains))
+        try:
+            asyncio.run(run(parsed, domains))
+        except KeyboardInterrupt:
+            print("[*] Stopping Festin")
 
 
 if __name__ == '__main__':
