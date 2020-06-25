@@ -40,7 +40,8 @@ async def get_links(cli_args: argparse.Namespace,
     for scheme in ("http", "https"):
         try:
             async with aiohttp.ClientSession(connector=build_tor_connector(
-                    cli_args), timeout=cli_args.http_timeout
+                    cli_args),
+                    timeout=aiohttp.ClientTimeout(total=cli_args.http_timeout)
             ) as session:
 
                 async with session.get(f"{scheme}://{domain}",
@@ -70,7 +71,8 @@ async def get_links(cli_args: argparse.Namespace,
 
     for d in found_domains:
         if not quiet:
-            print(f"      -> Adding domain from link '{d}'", flush=True)
+            print(f"      -> Adding domain to proposal list from "
+                  f"link '{d}'", flush=True)
 
         await input_queue.put(d)
 
@@ -88,17 +90,24 @@ async def get_dns_info(cli_args: argparse.Namespace,
 
     resolver = ProxyResolver(proxies=dns_servers)
 
-    try:
-        cname_response = await resolver.query(domain, types.CNAME)
-    except Exception as e:
-        if debug:
-            print(e)
-        return
+    for _ in range(3):
+        try:
+            cname_response = await resolver.query(domain, types.CNAME)
+        except Exception as e:
+            if debug:
+                print("Error in 'get_dns_info': ", e)
+            return
 
-    for resp in cname_response.an:
-        if resp.data:
-            print(f"        +> Found new CNAME '{resp.data}'", flush=True)
-            await input_queue.put(resp.data)
+        try:
+            for resp in cname_response.an:
+                if resp.data:
+                    print(f"        +> Found new CNAME '{resp.data}'", flush=True)
+                    await input_queue.put(resp.data)
+
+            break
+
+        except AttributeError:
+            await asyncio.sleep(1)
 
 
 async def get_s3(cli_args: argparse.Namespace,
@@ -111,7 +120,9 @@ async def get_s3(cli_args: argparse.Namespace,
 
     try:
         async with aiohttp.ClientSession(connector=build_tor_connector(
-                cli_args), timeout=cli_args.http_timeout) as session:
+                cli_args),
+                timeout=aiohttp.ClientTimeout(total=cli_args.http_timeout)
+        ) as session:
 
             if domain.endswith("s3.amazonaws.com"):
                 bucket_name = domain
@@ -150,7 +161,7 @@ async def get_s3(cli_args: argparse.Namespace,
 
     except Exception as e:
         if debug:
-            print(e)
+            print("Error in 'get_s3': ", e)
 
 
 __all__ = ("get_s3", "get_dns_info", "get_links")
