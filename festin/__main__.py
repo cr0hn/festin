@@ -1,10 +1,8 @@
+import re
 import asyncio
 import argparse
-import json
-import re
-from functools import partial
 
-from typing import List, Set, Callable
+from typing import Set
 
 import aiofiles
 
@@ -79,18 +77,28 @@ async def analyze_domains(cli_args: argparse.Namespace,
 
     while True:
 
-        try:
-            domain: str = await asyncio.wait_for(input_queue_domains.get(), 5)
-        except asyncio.exceptions.TimeoutError:
-            if all(t.done() for t in tasks) and input_queue_domains.empty():
-                return
-            else:
-                continue
+        if cli_args.watch:
+            domain: str = await input_queue_domains.get()
+        else:
+            try:
+                domain: str = await asyncio.wait_for(
+                    input_queue_domains.get(),
+                    5
+                )
+            except asyncio.exceptions.TimeoutError:
+                if all(t.done() for t in tasks)\
+                        and input_queue_domains.empty():
+                    return
+                else:
+                    continue
 
         if not domain or domain in processed_domains:
             continue
 
         if any(domain.endswith(d) for d in BLACK_LIST_TLD):
+            continue
+
+        if any(domain.startswith(d) for d in BLACK_LIST_PREFISES):
             continue
 
         if domain in BLACK_LIST_DOMAINS:
@@ -136,6 +144,10 @@ async def run(cli_args: argparse.Namespace, init_domains: list):
                 # Select only new domains
                 new_domains = clean_content_file.difference(domains_processed)
 
+                if not new_domains:
+                    print(f"    -> Added new domain to "
+                          f"'{cli_args.file_domains}' but there're already "
+                          f"in file. So skipping")
                 # Append new domains to processed domains and to the queue
                 # domains_processed.update(new_domains)
                 for d in new_domains:

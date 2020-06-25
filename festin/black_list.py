@@ -14,3 +14,7 @@ BLACK_LIST_TLD = {
     "eurolandir.com",
     "trafficmanager.net"
 }
+
+BLACK_LIST_PREFISES = {
+    "cdn"
+}
