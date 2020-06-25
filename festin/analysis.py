@@ -31,6 +31,7 @@ def build_tor_connector(cli_args: argparse.Namespace) \
 async def get_links(cli_args: argparse.Namespace,
                     domain: str,
                     input_queue: asyncio.Queue):
+    debug = cli_args.debug
     quiet = cli_args.quiet
 
     # Get links
@@ -39,7 +40,7 @@ async def get_links(cli_args: argparse.Namespace,
     for scheme in ("http", "https"):
         try:
             async with aiohttp.ClientSession(connector=build_tor_connector(
-                    cli_args)
+                    cli_args), timeout=cli_args.http_timeout
             ) as session:
 
                 async with session.get(f"{scheme}://{domain}",
@@ -59,7 +60,8 @@ async def get_links(cli_args: argparse.Namespace,
                             found_domains.add(loc)
 
         except Exception as e:
-            print(e)
+            if debug:
+                print(e)
             continue
 
     if not quiet and found_domains:
@@ -77,6 +79,8 @@ async def get_dns_info(cli_args: argparse.Namespace,
                        domain: str,
                        input_queue: asyncio.Queue):
 
+    debug = cli_args.debug
+
     if cli_args.dns_resolver:
         dns_servers =("*", cli_args.dns_resolver.split(","))
     else:
@@ -87,7 +91,8 @@ async def get_dns_info(cli_args: argparse.Namespace,
     try:
         cname_response = await resolver.query(domain, types.CNAME)
     except Exception as e:
-        print(e)
+        if debug:
+            print(e)
         return
 
     for resp in cname_response.an:
@@ -101,11 +106,12 @@ async def get_s3(cli_args: argparse.Namespace,
                  input_queue: asyncio.Queue,
                  results_queue: asyncio.Queue):
 
+    debug = cli_args.debug
     quiet = cli_args.quiet
 
     try:
         async with aiohttp.ClientSession(connector=build_tor_connector(
-                cli_args)) as session:
+                cli_args), timeout=cli_args.http_timeout) as session:
 
             if domain.endswith("s3.amazonaws.com"):
                 bucket_name = domain
@@ -143,7 +149,8 @@ async def get_s3(cli_args: argparse.Namespace,
                     await input_queue.put(redirection_url)
 
     except Exception as e:
-        print(e)
+        if debug:
+            print(e)
 
 
 __all__ = ("get_s3", "get_dns_info", "get_links")

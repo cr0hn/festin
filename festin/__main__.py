@@ -93,10 +93,6 @@ async def analyze_domains(cli_args: argparse.Namespace,
                 else:
                     continue
 
-        if not domain or domain in processed_domains:
-            print(f"      -> [SKIP] domain '{domain}' already processed")
-            continue
-
         if any(domain.endswith(d) for d in BLACK_LIST_TLD):
             print(f"      -> [SKIP] domain '{domain}' is in blacklist")
             continue
@@ -108,6 +104,10 @@ async def analyze_domains(cli_args: argparse.Namespace,
 
         if domain in BLACK_LIST_DOMAINS:
             print(f"      -> [SKIP] domain '{domain}' is in blacklist")
+            continue
+
+        if not domain or domain in processed_domains:
+            print(f"      -> [SKIP] domain '{domain}' already processed")
             continue
 
         processed_domains.add(domain)
@@ -259,23 +259,30 @@ def main():
     )
 
     parser.add_argument("domains", nargs="*")
-    parser.add_argument("--debug", default=False, action="store_true")
+    parser.add_argument("--version",
+                        help="show version")
     parser.add_argument("-f", "--file-domains",
                         default=None,
                         help="file with domains")
-    parser.add_argument("--no-links",
-                        action="store_false",
-                        default=False,
-                        help="extract web site links")
     parser.add_argument("-w", "--watch",
                         action="store_true",
                         default=False,
                         help="watch for new domains in file domains '-f' "
                              "option")
     parser.add_argument("-c", "--concurrency",
-                        default=2,
+                        default=5,
                         type=int,
                         help="max concurrency")
+
+    group_http = parser.add_argument_group('HTTP Probes')
+    group_http.add_argument("--no-links",
+                        action="store_false",
+                        default=False,
+                        help="extract web site links")
+    group_http.add_argument("-T", "--http-timeout",
+                        type=int,
+                        default=5,
+                        help="set timeout for http connections")
 
     group_results = parser.add_argument_group('Results')
     group_results.add_argument("-rr", "--result-file",
@@ -293,6 +300,10 @@ def main():
                             help="Use Tor as proxy")
 
     group_display = parser.add_argument_group('Display options')
+    group_display.add_argument("--debug",
+                               default=False,
+                               action="store_true",
+                               help="enable debug mode")
     group_display.add_argument("--no-print",
                                default=False,
                                action="store_true",
@@ -321,7 +332,6 @@ def main():
                            default=None,
                            help="only follow domains that matches this regex")
     group_dns.add_argument("-ds", "--dns-resolver",
-                           nargs="*",
                            default=None,
                            help="comma separated custom domain name servers")
 

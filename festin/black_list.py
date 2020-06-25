@@ -12,7 +12,12 @@ BLACK_LIST_TLD = {
     "cloudfront.net",
     "etclicky.com",
     "eurolandir.com",
-    "trafficmanager.net"
+    "trafficmanager.net",
+    "googleapis.com",
+    "gstatic.com",
+    "facebook.com",
+    "elb.amazonaws.com",
+    "amakaiedge.net",
 }
 
 BLACK_LIST_PREFISES = {
