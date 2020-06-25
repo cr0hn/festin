@@ -8,4 +8,5 @@ async_dns
 aiohttp
 aiohttp-proxy
 
+colorama
 filetype

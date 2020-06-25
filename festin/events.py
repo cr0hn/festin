@@ -2,7 +2,7 @@ import json
 import asyncio
 import argparse
 
-from typing import List
+from typing import List, Tuple
 from functools import partial
 
 import aiofiles
@@ -16,11 +16,12 @@ STOP_KEYWORD = "########STOP########"
 async def on_result_print_results(cli_args, bucket):
 
     try:
-        print(f"    *> '{bucket.domain}' - Found {len(bucket.objects)}"
+        print(f"[[[FOUND]]]] '{bucket.domain}' - Found {len(bucket.objects)}"
               f"public objects")
 
-        for obj in bucket.objects:
-            print(f"        -> {bucket.domain}/{obj}")
+        if cli_args.debug:
+            for obj in bucket.objects:
+                print(f"        -> {bucket.domain}/{obj}")
 
     finally:
         if not bucket.objects:
@@ -34,11 +35,14 @@ async def on_result_save_streaming_results(cli_args, bucket):
 
 async def on_domain_save_new_domains(cli_args,
                                      domain: str,
+                                     file_name: str,
                                      initial_domains: List[str]):
 
-    if domain not in initial_domains:
-        async with aiofiles.open(cli_args.discovered_domains, mode='a+') as f:
-            await f.write(f"{domain}\n")
+    if initial_domains and domain in initial_domains:
+        return
+
+    async with aiofiles.open(file_name, mode='a+') as f:
+        await f.write(f"{domain}\n")
 
 
 async def on_results_add_to_redis(
@@ -56,8 +60,8 @@ async def on_results_add_to_redis(
 
 async def on_domain_event(cli_args,
                           domain_queue: asyncio.Queue,
-                          initial_domains: List,
-                          consumers: List):
+                          initial_domains: List or None,
+                          consumers: List[Tuple]):
     while True:
 
         domain = await domain_queue.get()
@@ -65,8 +69,8 @@ async def on_domain_event(cli_args,
         if domain == STOP_KEYWORD:
             break
 
-        for c in consumers:
-            await c(cli_args, domain, initial_domains)
+        for fn, filename in consumers:
+            await fn(cli_args, domain, filename, initial_domains)
 
 
 async def on_result_event(cli_args,
