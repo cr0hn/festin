@@ -1,4 +1,5 @@
 import re
+import os
 import asyncio
 import argparse
 import platform
@@ -6,6 +7,7 @@ import platform
 from typing import Set
 
 import aiofiles
+import pkg_resources
 
 from colorama import Fore, Style
 from watchgod import awatch
@@ -311,11 +313,14 @@ def main():
         exit(1)
 
     parser = argparse.ArgumentParser(
-        description='S3 Data Analyzer'
+        description='Festin - the '
+                    'powered S3 bucket finder and content discover'
     )
 
     parser.add_argument("domains", nargs="*")
     parser.add_argument("--version",
+                        action="store_true",
+                        default=False,
                         help="show version")
     parser.add_argument("-f", "--file-domains",
                         default=None,
@@ -403,6 +408,11 @@ def main():
 
     if not parsed.quiet:
         print(LOGO)
+
+    if parsed.version:
+        print(f"version: {pkg_resources.get_distribution('festin').version}")
+        print()
+        exit()
 
     if not parsed.domain_regex:
         print()
