@@ -47,7 +47,14 @@ BLACK_LIST_TLD = {
     "stackoverflow.com"
     "jqueryui.com",
     "jquerymobile.com",
-    "adform.net"
+    "adform.net",
+    "packtpub.com",
+    "mozilla.org",
+    "w3c.org",
+    "stackexchange.com",
+    "stackoverflow.com",
+    "serverfault.com",
+    "superuser.com"
 }
 
 BLACK_LIST_PREFISES = {

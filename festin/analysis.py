@@ -150,7 +150,11 @@ async def get_links(cli_args: argparse.Namespace,
 
         if content_type == "html":
 
+            if not content:
+                continue
+
             tree = etree.HTML(content)
+
             try:
                 for link in list(tree.xpath(".//@href") + tree.xpath(".//@src")):
                     link_domain = urlparse(link).netloc
@@ -180,7 +184,9 @@ async def get_links(cli_args: argparse.Namespace,
 
                     await input_queue.put((link_domain, recursion_level - 1))
             except AttributeError as e:
-                print(e)
+                print(f"[{PCE}] Error in parsing response from '{domain}'"
+                      f": {str(e)}")
+                continue
 
         if content_type == "xml":
 

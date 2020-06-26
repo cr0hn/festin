@@ -343,6 +343,9 @@ def main():
                             type=int,
                             default=3,
                             help="maximum recursison when follow links")
+    group_http.add_argument("-dr", "--domain-regex",
+                           default=None,
+                           help="only follow domains that matches this regex")
 
     group_results = parser.add_argument_group('Results')
     group_results.add_argument("-rr", "--result-file",
@@ -392,9 +395,6 @@ def main():
                            action="store_false",
                            default=False,
                            help="not follow dns cnames")
-    group_dns.add_argument("-dr", "--domain-regex",
-                           default=None,
-                           help="only follow domains that matches this regex")
     group_dns.add_argument("-ds", "--dns-resolver",
                            default=None,
                            help="comma separated custom domain name servers")
@@ -403,6 +403,18 @@ def main():
 
     if not parsed.quiet:
         print(LOGO)
+
+    if not parsed.domain_regex:
+        print()
+        print("#" * 50)
+        print("#                                                #")
+        print("#   IT'S VERY IMPORTANT TO CONFIGURE A DOMAIN    #")
+        print("#   REGEX (Option '-dr'). OTHERWISE CRAWLER      #")
+        print("#   WILL FOLLOW ANY LINK NO MATTER WHERE THEY    #")
+        print("#   POINT TO                                     #")
+        print("#                                                #")
+        print("#" * 50)
+        print()
 
     domains = []
     if parsed.domains:
