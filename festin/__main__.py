@@ -13,9 +13,12 @@ from watchgod import awatch
 from festin import *
 from festin.events import *
 
+SK = f"{Fore.YELLOW}SKIP{Style.RESET_ALL}"
+SKR = f"{Fore.CYAN}SKIP-RECURSION{Style.RESET_ALL}"
 
 async def analyze(cli_args: argparse.Namespace,
                   domain: str,
+                  recursion_level: int,
                   results_queue: asyncio.Queue,
                   sem: asyncio.Semaphore,
                   input_domains_queue: asyncio.Queue):
@@ -28,6 +31,7 @@ async def analyze(cli_args: argparse.Namespace,
         t1 = asyncio.create_task(get_s3(
             cli_args,
             domain,
+            recursion_level,
             input_domains_queue,
             results_queue)
         )
@@ -45,6 +49,7 @@ async def analyze(cli_args: argparse.Namespace,
             t2 = asyncio.create_task(get_links(
                 cli_args,
                 domain,
+                recursion_level,
                 input_domains_queue,
                 results_queue)
             )
@@ -63,6 +68,7 @@ async def analyze(cli_args: argparse.Namespace,
             t3 = asyncio.create_task(get_dns_info(
                 cli_args,
                 domain,
+                recursion_level,
                 input_domains_queue)
             )
 
@@ -95,10 +101,14 @@ async def analyze_domains(cli_args: argparse.Namespace,
     while True:
 
         if cli_args.watch:
-            domain: str = await input_queue_domains.get()
+            domain, recursion_level = await input_queue_domains.get()
         else:
             try:
-                domain: str = await asyncio.wait_for(
+                #
+                # When we execute one shot, we need a way to stop the loop ->
+                # a timeout each 5 seconds
+                #
+                domain, recursion_level = await asyncio.wait_for(
                     input_queue_domains.get(),
                     5
                 )
@@ -109,6 +119,11 @@ async def analyze_domains(cli_args: argparse.Namespace,
                 else:
                     continue
 
+        if recursion_level < 0:
+            print(f"[{SKR}] Maximum recursion level reached. Omitting "
+                  f"'{domain}'")
+            continue
+
         if hasattr(domain, "decode"):
             domain = domain.decode("UTF-8")
 
@@ -118,8 +133,7 @@ async def analyze_domains(cli_args: argparse.Namespace,
             print(message)
 
         if not domain or domain in processed_domains:
-            print(
-                f"[{Fore.YELLOW}SKIP{Style.RESET_ALL}] domain '{domain}' already processed")
+            print(f"[{SK}] domain '{domain}' already processed")
             continue
 
         processed_domains.add(domain)
@@ -134,6 +148,7 @@ async def analyze_domains(cli_args: argparse.Namespace,
             asyncio.create_task(analyze(
                 cli_args,
                 domain,
+                recursion_level,
                 results_queue,
                 sem,
                 input_queue_domains
@@ -172,7 +187,9 @@ async def run(cli_args: argparse.Namespace, init_domains: list):
                     if not quiet:
                         print(f"[DOMAIN>>>>] Added for processing: '{d}'")
 
-                    await input_domain_queue.put(d)
+                    await input_domain_queue.put(
+                        (d, cli_args.http_max_recursion)
+                    )
 
     quiet = cli_args.quiet
     domains_processed = set()
@@ -185,7 +202,9 @@ async def run(cli_args: argparse.Namespace, init_domains: list):
     # Populate initial domains
     #
     for d in init_domains:
-        input_domain_queue.put_nowait(d)
+        input_domain_queue.put_nowait(
+            (d, cli_args.http_max_recursion)
+        )
 
     #
     # On results events
@@ -312,6 +331,10 @@ def main():
                             type=int,
                             default=5,
                             help="set timeout for http connections")
+    group_http.add_argument("-M", "--http-max-recursion",
+                            type=int,
+                            default=3,
+                            help="maximum recursison when follow links")
 
     group_results = parser.add_argument_group('Results')
     group_results.add_argument("-rr", "--result-file",

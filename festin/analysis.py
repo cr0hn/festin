@@ -75,6 +75,7 @@ async def get_bucket_info(cli_args, domain, bucket_name: str):
 
 async def get_links(cli_args: argparse.Namespace,
                     domain: str,
+                    recursion_level: int,
                     input_queue: asyncio.Queue,
                     results_queue: asyncio.Queue):
     debug = cli_args.debug
@@ -136,34 +137,36 @@ async def get_links(cli_args: argparse.Namespace,
         if content_type == "html":
 
             tree = etree.HTML(content)
+            try:
+                for link in list(tree.xpath(".//@href") + tree.xpath(".//@src")):
+                    link_domain = urlparse(link).netloc
 
-            for link in list(tree.xpath(".//@href") + tree.xpath(".//@src")):
-                link_domain = urlparse(link).netloc
+                    if not link_domain:
+                        continue
 
-                if not link_domain:
-                    continue
-
-                if link_domain in already_added_domains:
-                    continue
-                else:
-                    already_added_domains.add(link_domain)
-
-                if message := valid_domain_or_link(link_domain):
-                    print(message)
-                    continue
-
-                if not quiet:
-                    if "s3." in link:
-                        print(f"[{PC}] "
-                              f"Possible s3 bucket found. "
-                              f"'{origin}' -> "
-                              f"'{link_domain}'", flush=True)
+                    if link_domain in already_added_domains:
+                        continue
                     else:
-                        print(f"[{PC3}] Adding "
-                              f"domain to proposal. "
-                              f"{origin} -> '{link_domain}'", flush=True)
+                        already_added_domains.add(link_domain)
 
-                await input_queue.put(link_domain)
+                    if message := valid_domain_or_link(link_domain):
+                        print(message)
+                        continue
+
+                    if not quiet:
+                        if "s3." in link:
+                            print(f"[{PC}] "
+                                  f"Possible s3 bucket found. "
+                                  f"'{origin}' -> "
+                                  f"'{link_domain}'", flush=True)
+                        else:
+                            print(f"[{PC3}] Adding "
+                                  f"domain to proposal. "
+                                  f"{origin} -> '{link_domain}'", flush=True)
+
+                    await input_queue.put((link_domain, recursion_level - 1))
+            except AttributeError as e:
+                print(e)
 
         if content_type == "xml":
 
@@ -183,13 +186,16 @@ async def get_links(cli_args: argparse.Namespace,
                 elif response.status == 301:
                     redirection_url = get_redirection(await response.read())
 
-                    await input_queue.put(redirection_url)
+                    await input_queue.put(
+                        (redirection_url, recursion_level - 1)
+                    )
             except Exception as e:
                 # Parser error
                 continue
 
 async def get_dns_info(cli_args: argparse.Namespace,
                        domain: str,
+                       recursion_level: int,
                        input_queue: asyncio.Queue):
 
     debug = cli_args.debug
@@ -213,7 +219,7 @@ async def get_dns_info(cli_args: argparse.Namespace,
 
         try:
             for resp in cname_response.an:
-                if resp.data:
+                if resp.data and resp.qtype==types.CNAME:
                     print(f"[{PD}] Found new CNAME. '{domain}' -> "
                           f"'{resp.data}'", flush=True)
 
@@ -221,7 +227,7 @@ async def get_dns_info(cli_args: argparse.Namespace,
                         print(message)
                         continue
 
-                    await input_queue.put(resp.data)
+                    await input_queue.put((resp.data, recursion_level - 1))
 
             break
 
@@ -231,6 +237,7 @@ async def get_dns_info(cli_args: argparse.Namespace,
 
 async def get_s3(cli_args: argparse.Namespace,
                  domain: str,
+                 recursion_level: int,
                  input_queue: asyncio.Queue,
                  results_queue: asyncio.Queue):
 
@@ -265,7 +272,7 @@ async def get_s3(cli_args: argparse.Namespace,
                         f"'{domain}' -> {red.redirection}",
                         flush=True)
 
-                await input_queue.put(red.redirection)
+                await input_queue.put((red.redirection, recursion_level - 1))
 
 
     except asyncio.exceptions.TimeoutError as e:
