@@ -51,6 +51,6 @@ $ docker run --rm -it cr0hn/fesin -h
 
 ## License
 
-This project is distributed under `BSD license <https://github.com/cr0hn/festin/blob/master/LICENSE>`_
+This project is distributed under [BSD license](https://github.com/cr0hn/festin/blob/master/LICENSE>)
 
 
