@@ -4,6 +4,7 @@ import argparse
 from urllib.parse import urlparse
 
 import aiohttp
+import aiohttp_proxy
 
 from lxml import etree
 from async_dns.core import types
@@ -35,6 +36,19 @@ def build_tor_connector(cli_args: argparse.Namespace) \
         )
     else:
         return None
+
+async def check_tor_connection(cli_args) -> bool:
+
+    try:
+        async with aiohttp.ClientSession(connector=build_tor_connector(
+                cli_args),
+                timeout=aiohttp.ClientTimeout(total=cli_args.http_timeout)
+        ) as session:
+            async with session.get("https://www.google.com") as response:
+                return True
+    except aiohttp_proxy.errors.SocksConnectionError as e:
+        return False
+
 
 class BucketRedirectException(Exception):
 
@@ -284,4 +298,4 @@ async def get_s3(cli_args: argparse.Namespace,
             print(f"[{PBE}] Error in 'get_s3': {str(e)} ")
 
 
-__all__ = ("get_s3", "get_dns_info", "get_links")
+__all__ = ("get_s3", "get_dns_info", "get_links", "check_tor_connection")

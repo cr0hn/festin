@@ -199,6 +199,14 @@ async def run(cli_args: argparse.Namespace, init_domains: list):
     raw_discovered_domains = asyncio.Queue()
 
     #
+    # Check proxy connection
+    #
+    if cli_args.tor:
+        if not await check_tor_connection(cli_args):
+            print('[!] Can\'t stablish connection to TOR')
+            exit(1)
+
+    #
     # Populate initial domains
     #
     for d in init_domains:
