@@ -143,7 +143,7 @@ async def analyze_domains(cli_args: argparse.Namespace,
         await discovered_domains.put(domain)
 
         if domain_regex:
-            if not domain_regex.match(domain):
+            if not domain_regex.search(domain):
                 continue
 
         tasks.append(
