@@ -113,10 +113,10 @@ DNS options:
 ## Examples
 
 - Run against *target.com* with default options and leaving result to target.com.result file
-  ```festin target.com -rr target.com.result```
+  ```festin target.com -rr target.com.result.json```
 
 - Run against *target.com* using tor proxy, with concurrency of 5, using DNS 212.166.64.1 for resolving CNAMEs and leaving result to target.com.result file
-  ```festin target.com -c 5 -rr target.com.result --tor -ds 212.166.64.1```
+  ```festin target.com -c 5 -rr target.com.result.json --tor -ds 212.166.64.1```
 
 ### dnsrecon + festin
 
@@ -131,13 +131,15 @@ The domain chosen for this example is *target.com*.
   With this command we generate a file with one domain per line. This is the input that festin needs.
 
 - **Step 3**: Run festin with desired options and save output
-  ```festin -f target.com.domains -c 5 -rr target.com.result --tor -ds 212.166.64.1 >target.com.stdout 2>target.com.stderr```
+  ```festin -f target.com.domains -c 5 -rr target.com.result.json --tor -ds 212.166.64.1 >target.com.stdout 2>target.com.stderr```
 
 In this example the resulting files are:
 
-- target.com.result: Main result file with one line per bucket found. Each line is a JSON object.
+- target.com.result.json: Main result file with one line per bucket found. Each line is a JSON object.
 - target.com.stdout: The standard output of festin command execution
 - target.com.stderr: The standard error of festin command execution
+
+In order to easy the proccesing of multiple domains, we provide a simple script *examples/loop.sh* that automatize this.
 
 ## License
 

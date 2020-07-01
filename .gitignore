@@ -583,3 +583,5 @@ pip-selfcheck.json
 .jekyll-metadata
 .jekyll-cache
 _site
+
+outdir
