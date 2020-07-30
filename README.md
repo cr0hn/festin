@@ -336,7 +336,7 @@ We recommend to setup a proxy when you use `FestIn`.
 
 ![Mr looquer](https://raw.githubusercontent.com/cr0hn/festin/master/images/whouses/mrlooquer.jpg)
 
-They analyze and assess your company risk exposure in real time
+They analyze and assess your company risk exposure in real time. [Website](https://www.mrlooquer.com)
 
 ## License
 
