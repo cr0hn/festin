@@ -327,6 +327,14 @@ When you perform a lot of test against AWS S3, AWS includes your IP in a black l
 
 We recommend to setup a proxy when you use `FestIn`.    
 
+## Who uses FestIn
+
+## MrLooquer
+
+![Mr looquer](https://raw.githubusercontent.com/cr0hn/festin/master/images/whouses/mrlooquer.jpg)
+
+They analyze and assess your company risk exposure in real time
+
 ## License
 
 This project is distributed under [BSD license](https://github.com/cr0hn/festin/blob/master/LICENSE>)
