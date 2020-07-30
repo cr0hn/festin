@@ -25,7 +25,10 @@
   - [Step 1 - Run dnsrecon with desired options against target domain and save the output](#step-1---run-dnsrecon-with-desired-options-against-target-domain-and-save-the-output)
   - [Step 2 - Prepare the previous generated file to feed `FestIn`](#step-2---prepare-the-previous-generated-file-to-feed-festin)
   - [Step 3 - Run FestIn with desired options and save output](#step-3---run-festin-with-desired-options-and-save-output)
+        - [Run against *target.com* using tor proxy, with concurrency of 5, using DNS 212.166.64.1 for resolving CNAMEs and leaving result to target.com.result file:](#run-against-targetcom-using-tor-proxy-with-concurrency-of-5-using-dns-212166641-for-resolving-cnames-and-leaving-result-to-targetcomresult-file)
 - [F.A.Q.](#faq)
+- [Who uses FestIn](#who-uses-festin)
+- [MrLooquer](#mrlooquer)
 - [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -312,7 +315,7 @@ Run against *target.com* with default options and leaving result to target.com.r
 > festin target.com -rr target.com.result.json 
 ```
 
-Run against *target.com* using tor proxy, with concurrency of 5, using DNS 212.166.64.1 for resolving CNAMEs and leaving result to target.com.result file:
+###### Run against *target.com* using tor proxy, with concurrency of 5, using DNS 212.166.64.1 for resolving CNAMEs and leaving result to target.com.result file:
 
 ```bash
 > festin target.com -c 5 -rr target.com.result.json --tor -ds 212.166.64.1 
