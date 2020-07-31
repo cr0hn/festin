@@ -75,7 +75,7 @@ $ festin -h
 ### Using Docker
 
 ```bash
-$ docker run --rm -it cr0hn/fesin -h
+$ docker run --rm -it cr0hn/festin -h
 ```
 
 ## Full options
@@ -271,7 +271,7 @@ In a different terminal we can write:
 
 Each new domain added to *domains.txt* will wakeup `FestIn`.
 
-## Example: Mixing FesIn + DnsRecon
+## Example: Mixing FesTin + DnsRecon
 
 **Using DnsRecon**
 

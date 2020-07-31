@@ -6,7 +6,9 @@ BLACK_LIST_DOMAINS = {
     "static.getclicky.com"
 }
 
-BLACK_LIST_TLD = {
+# Thanks @ffranz for the typo report. TLD is incorrect. The correct name is FLD
+# Report: https://ibb.co/RyvHKT0
+BLACK_LIST_FLD = {
     "cloudfront.net",
     "etclicky.com",
     "eurolandir.com",
