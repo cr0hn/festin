@@ -443,7 +443,11 @@ def main():
         exit(1)
 
     if parsed.domain_regex:
-        parsed.domain_regex = re.compile(parsed.domain_regex)
+        try:
+            parsed.domain_regex = re.compile(parsed.domain_regex)
+        except re.error:
+            print("Invalid regex! You must use a valid POSIX regex")
+            exit(1)
 
     if parsed.watch:
         if not parsed.file_domains:

@@ -178,8 +178,13 @@ domain3.com
 Example:
 
 ```bash
-> festin -T 20 -H 8 -dr *mydomain* mydomain.com 
+> festin -T 20 -M 8 -dr *mydomain* mydomain.com 
 ```
+
+    BE CAREFUL: -dr (or --domain-regex) only accept valid POSIX regex. 
+    
+    *mydomain.com* -> is not a valida POSIX regex
+    .mydomain\.com. -> is a valida POSIX regex
 
 ### Manage results
 
