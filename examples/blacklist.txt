@@ -1,0 +1,8 @@
+cdn
+photos
+js
+javascript
+css
+png
+jpg
+jpeg

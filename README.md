@@ -173,12 +173,16 @@ domain3.com
 
 - Timeout (`-T` or `--http-timeout`): configure a timeout for HTTP connections. If website of the domain you want to analyze is slow, we recommend to increase this value. By default timeout is **5 seconds**.
 - Maximum recursion (`-H` or `--http-max-recursion`): this value setup a limit for crawling recursion. Otherwise `FestIn` will scan all internet. By default this value is 3. It means that only will follow: domain1.com -> [link] -> domain2.com -> [link] -> domain3.com -> [link] -> Maximum recursion reached. Stop
-- Limit domains (`-dr` or `--domain-regex`): set this option to limit crawler to these domains that matches with this regex.  
+- Limit domains (`-dr` or `--domain-regex`): set this option to limit crawler to these domains that matches with this regex.
+- Black list (-B): configure a black list words file. Each domain that matches with some word in the black list will be skipped.
+- White list (-W): configure a white list words file. Each domain that DOESN'T match with some word in the white list will be skipped.
 
 Example:
 
 ```bash
-> festin -T 20 -M 8 -dr .mydomain. mydomain.com 
+> echo "cdn" > blacklist.txt
+> echo "photos" >> blacklist.txt
+> festin -T 20 -M 8 -B blacklist.txt -dr .mydomain. mydomain.com 
 ```
 
     BE CAREFUL: -dr (or --domain-regex) only accept valid POSIX regex. 
