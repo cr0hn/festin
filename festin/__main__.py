@@ -4,7 +4,7 @@ import asyncio
 import argparse
 import platform
 
-from typing import Set
+from typing import Set, List
 
 import aiofiles
 import pkg_resources
@@ -87,6 +87,8 @@ async def analyze(cli_args: argparse.Namespace,
 
 
 async def analyze_domains(cli_args: argparse.Namespace,
+                          black_list: List[str],
+                          white_list: List[str],
                           processed_domains: Set[str],
                           results_queue: asyncio.Queue,
                           input_queue_domains: asyncio.Queue,
@@ -146,6 +148,15 @@ async def analyze_domains(cli_args: argparse.Namespace,
             if not domain_regex.search(domain):
                 continue
 
+        if black_list and domain in black_list:
+            continue
+
+        if white_list and domain not in white_list:
+            continue
+
+        #
+        # Launch the background task that analyzes the domain
+        #
         tasks.append(
             asyncio.create_task(analyze(
                 cli_args,
@@ -199,6 +210,23 @@ async def run(cli_args: argparse.Namespace, init_domains: list):
     results_queue = asyncio.Queue()
     filtered_discovered_domains = asyncio.Queue()
     raw_discovered_domains = asyncio.Queue()
+    domain_black_list = cli_args.domain_black_list
+    domain_white_list = cli_args.domain_white_list
+
+    #
+    # Load black list / white list
+    #
+    if domain_white_list:
+        with open(domain_white_list, "r") as f:
+            white_list = list(set(f.read().splitlines()))
+    else:
+        white_list = []
+
+    if domain_black_list:
+        with open(domain_black_list, "r") as f:
+            black_list = list(set(f.read().splitlines()))
+    else:
+        black_list = []
 
     #
     # Check proxy connection
@@ -281,6 +309,8 @@ async def run(cli_args: argparse.Namespace, init_domains: list):
     try:
         await analyze_domains(
             cli_args,
+            black_list,
+            white_list,
             domains_processed,
             results_queue,
             input_domain_queue,
@@ -348,11 +378,19 @@ def main():
                             type=int,
                             default=3,
                             help="maximum recursison when follow links")
-    group_http.add_argument("-dr", "--domain-regex",
+
+    group_filtering = parser.add_argument_group('filtering')
+    group_filtering.add_argument("-dr", "--domain-regex",
                            default=None,
                            help="only follow domains that matches this regex")
+    group_filtering.add_argument("-B", "--domain-black-list",
+                           default=None,
+                           help="load a file with a black list words")
+    group_filtering.add_argument("-W", "--domain-white-list",
+                           default=None,
+                           help="load a file with a white list words")
 
-    group_results = parser.add_argument_group('Results')
+    group_results = parser.add_argument_group('results')
     group_results.add_argument("-rr", "--result-file",
                                default=None,
                                help="results file")
@@ -447,6 +485,20 @@ def main():
             parsed.domain_regex = re.compile(parsed.domain_regex)
         except re.error:
             print("Invalid regex! You must use a valid POSIX regex")
+            exit(1)
+
+    if parsed.domain_black_list and parsed.domain_white_list:
+        print("[!] Black list option and White list option are incompatible.")
+        exit(1)
+
+    if parsed.domain_black_list:
+        if not os.path.exists(parsed.domain_black_list):
+            print(f"[!] Black list doesn't exits: '{parsed.domain_black_list}'")
+            exit(1)
+
+    if parsed.domain_white_list:
+        if not os.path.exists(parsed.domain_white_list):
+            print(f"[!] White list doesn't exits: '{parsed.parsed}'")
             exit(1)
 
     if parsed.watch:
