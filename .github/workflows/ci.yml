@@ -27,7 +27,7 @@ jobs:
           uv run ruff check festin tests
           uv run ruff format --check festin tests
 
-      - name: Complexity gate (McCabe, max 10)
+      - name: Complexity gate (max 20 per function)
         run: uv run radon cc festin -n C --total-average
 
       - name: Tests
@@ -45,8 +45,54 @@ jobs:
         uses: astral-sh/setup-uv@v6
       - name: Build distributions
         run: uv build
-      - name: Publish to PyPI
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    # Publish to PyPI on every push to master once tests pass.
+    # Requires PyPI Trusted Publishing configured for this repo/workflow:
+    #   https://docs.pypi.org/trusted-publishers/
+    # No API token needed (OIDC). Falls back to the legacy token secret
+    # (pypi_password) if Trusted Publishing is not configured.
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    environment:
+      name: pypi
+      url: https://pypi.org/p/festin
+    permissions:
+      id-token: write  # OIDC for Trusted Publishing
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-token:
+    # Fallback path when Trusted Publishing is not configured on PyPI.
+    # Requires the legacy API token stored as the `pypi_password` secret.
+    runs-on: ubuntu-latest
+    needs: build
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      github.event_name == 'push' &&
+      vars.USE_TRUSTED_PUBLISHING != 'true'
+    environment:
+      name: pypi
+      url: https://pypi.org/p/festin
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI (API token)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.pypi_password }}

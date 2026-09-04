@@ -5,22 +5,27 @@ does. Requires no network beyond what the local resolver does; error paths
 are pure argument validation.
 """
 
+import os
 import subprocess
 import sys
 
 
-def _run_festin(*args: str) -> subprocess.CompletedProcess:
+def _run_festin(
+    *args: str, env_overrides: dict[str, str] | None = None
+) -> subprocess.CompletedProcess:
+    env = {**os.environ, **(env_overrides or {})}
     return subprocess.run(
         [sys.executable, "-m", "festin", *args],
         capture_output=True,
         text=True,
         timeout=60,
+        env=env,
     )
 
 
 class TestCLISmoke:
     def test_help_exits_zero_and_shows_options(self):
-        proc = _run_festin("--help")
+        proc = _run_festin("--help", env_overrides={"COLUMNS": "200"})
 
         assert proc.returncode == 0
         assert "Festin" in proc.stdout

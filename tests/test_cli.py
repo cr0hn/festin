@@ -11,7 +11,7 @@ from festin.cli import app
 from festin.models import ScanResult
 from festin.s3 import S3Bucket
 
-runner = CliRunner()
+runner = CliRunner(env={"COLUMNS": "200"})
 
 
 def _invoke(*args: str):

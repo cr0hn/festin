@@ -214,8 +214,20 @@ The candidate set is capped at 5000 names per scan (`MAX_CANDIDATES`).
 ### Multi-cloud probing
 
 `--cloud` probes the plain domain-derived candidates (without the full
-permutation set) against every supported provider — AWS S3, Azure Blob,
-Google Cloud Storage, DigitalOcean Spaces and Backblaze B2:
+permutation set) against every supported provider:
+
+**Supported providers — no API keys, no credentials, no access keys needed:**
+
+| Provider | Bucket URL pattern | Listing |
+|---|---|---|
+| **AWS S3** | `{bucket}.s3.amazonaws.com` | XML |
+| **Azure Blob** | `{bucket}.blob.core.windows.net` | XML |
+| **Google Cloud Storage** | `{bucket}.storage.googleapis.com` | XML |
+| **DigitalOcean Spaces** | `{bucket}.nyc3.digitaloceanspaces.com` | XML |
+| **Backblaze B2** | `{bucket}.s3.us-west-004.backblazeb2.com` | XML |
+
+FestIn only reads **public listing endpoints**. It does not authenticate
+against any provider, so there is nothing to configure and nothing to leak.
 
 ```bash
 festin scan -q --cloud example.com
