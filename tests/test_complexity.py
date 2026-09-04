@@ -42,7 +42,7 @@ def test_all_package_files_parse():
     error would silently shrink the complexity scan. Modules with only
     constants (black_list, logo) legitimately produce no blocks."""
     sources = list(Path("festin").rglob("*.py"))
-    assert len(sources) >= 9
+    assert len(sources) >= 8
 
     seen = {str(f) for f, _ in _iter_functions(Path("festin"))}
     constant_only = {"festin/__init__.py", "festin/black_list.py", "festin/logo.py"}

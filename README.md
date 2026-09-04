@@ -19,7 +19,6 @@
   - [Manage results](#manage-results)
   - [Proxy usage](#proxy-usage)
   - [DNS Options](#dns-options)
-  - [Full Text Support](#full-text-support)
   - [Running as a service (or watching mode)](#running-as-a-service-or-watching-mode)
 - [Example: Mixing FesIn + DnsRecon](#example-mixing-fesin--dnsrecon)
   - [Step 1 - Run dnsrecon with desired options against target domain and save the output](#step-1---run-dnsrecon-with-desired-options-against-target-domain-and-save-the-output)
@@ -58,7 +57,6 @@ Main features that does `Festin` great:
 - **Recursively** search and feedback from the 3 engines: a domain found by dns crawler is send to S3 and Http Crawlers analyzer and the same for the S3 and Crawler.
 - Works as **'watching' mode**, listening for new domains in real time.
 - Save all of the domains discovered in a separate file for further analysis.
-- Allow to **download bucket objects** and put then in a **FullText Search Engine** (Redis Search) automatically, indexing the objects content allowing powerful search further.
 - **Limit** the search for specific domain/s.
 
 ## Install
@@ -110,7 +108,7 @@ usage: festin [-h] [--version] [-f FILE_DOMAINS] [-w] [-c CONCURRENCY]
               [-dr DOMAIN_REGEX] [-B DOMAIN_BLACK_LIST] [-W DOMAIN_WHITE_LIST]
               [-rr RESULT_FILE] [-rd DISCOVERED_DOMAINS]
               [-ra RAW_DISCOVERED_DOMAINS] [--tor] [--debug] [--no-print] [-q]
-              [--index] [--index-server INDEX_SERVER] [-dn] [-ds DNS_RESOLVER]
+              [-dn] [-ds DNS_RESOLVER]
               [domains ...]
 
 Festin - the powered S3 bucket finder and content discover
@@ -158,11 +156,6 @@ Display options:
   --debug               enable debug mode
   --no-print            doesn't print results in screen
   -q, --quiet           Use quiet mode
-
-Redis Search:
-  --index               Download and index documents into Redis
-  --index-server INDEX_SERVER
-                        Redis Search Server. Default: redis://localhost:6379
 
 DNS options:
   -dn, --no-dnsdiscover
@@ -269,27 +262,6 @@ Example:
 ```bash
 > festin -ds 8.8.8.8 mydomain.com 
 ```
-
-### Full Text Support
-
-`FestIn` not only can discover open S3 buckets. It also can download all content and store them in a Full Text Search Engine. **This means that you can perform Full Text Queries to the content of the bucket!**
-
-`FestIn` uses as Full Text Engine the Open Source project [Redis Search](https://oss.redislabs.com/redisearch/).
-
-This feature has two options:
-
-- Enable indexing (`--index`): to enable the indexing to the search engine you must setup this flag.
-- Redis Search config (`--index-server`): you only need to setup this option if your server is running in a different IP/Port that: *localhost:6379*.
-
-Example:
-
-```bash
-> docker run --rm -p 6700:6379 redislabs/redisearch:latest -d
-> festin --index --index-server redis://127.0.0.1:6700 mydomain.com
-```
-
-    Pay attention to option `--index-server` is must has the prefix **redis://** 
-
 
 ### Running as a service (or watching mode)
 

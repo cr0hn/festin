@@ -26,8 +26,6 @@ def make_cli_args(**overrides) -> argparse.Namespace:
         "debug": False,
         "no_print": False,
         "quiet": True,
-        "index": False,
-        "index_server": "redis://localhost:6379",
         "no_dnsdiscover": False,
         "dns_resolver": None,
     }

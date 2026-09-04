@@ -301,11 +301,8 @@ async def run(cli_args: argparse.Namespace, init_domains: list[str]):
 
 
 def _build_result_consumers(cli_args: argparse.Namespace) -> list:
-    """Result consumers: redis indexing, streaming file, printing."""
+    """Result consumers: streaming file, printing."""
     consumers = []
-
-    if cli_args.index:
-        consumers.append(_redis_index_consumer)
 
     if not cli_args.result_file:
         cli_args.result_file = "results.festin"
@@ -367,12 +364,6 @@ async def _load_domain_list(file_name: str | None) -> list[str]:
     async with aiofiles.open(file_name) as f:
         content = await f.read()
     return list(set(content.splitlines()))
-
-
-async def _redis_index_consumer(cli_args, bucket):
-    from festin.events import on_results_add_to_redis
-
-    await on_results_add_to_redis(cli_args, bucket)
 
 
 async def _streaming_results_consumer(cli_args, bucket):
@@ -520,19 +511,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         action="store_true",
         help="Use quiet mode",
-    )
-
-    group_redis = parser.add_argument_group("Redis Search")
-    group_redis.add_argument(
-        "--index",
-        default=None,
-        action="store_true",
-        help="Download and index documents into Redis",
-    )
-    group_redis.add_argument(
-        "--index-server",
-        default="redis://localhost:6379",
-        help="Redis Search Server. Default: redis://localhost:6379",
     )
 
     group_dns = parser.add_argument_group("DNS options")

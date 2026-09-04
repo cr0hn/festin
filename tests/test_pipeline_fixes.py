@@ -1,16 +1,10 @@
-"""Regression tests for filtered-discovered stream and download bounds."""
+"""Regression tests for filtered-discovered stream and analyze error logging."""
 
 import asyncio
 
-import respx
-from httpx import Response
-
 import festin.__main__ as main_mod
 from festin.__main__ import analyze_domains
-from festin.s3 import download_content_and_index
 from tests.conftest import make_cli_args
-
-BIG_CONTENT = b"x" * (1024 * 1024)  # 1 MB
 
 
 def _queues():
@@ -129,75 +123,6 @@ class TestDiscoveredStreamRespectsFilters:
         while not raw_q.empty():
             raw.append(raw_q.get_nowait())
         assert set(raw) == {"www.google.com", "ok.example.com"}
-
-
-class TestDownloadBounds:
-    """download_content_and_index must not buffer unbounded responses."""
-
-    async def test_oversized_content_length_skipped(self):
-        indexed = []
-
-        async def add_fn(bucket, path, content):
-            indexed.append((bucket, path, content))
-
-        with respx.mock:
-            respx.get(url__startswith="http://b.example.com").mock(
-                return_value=Response(
-                    200,
-                    content=b"",
-                    headers={"Content-Length": str(100 * 1024 * 1024)},
-                ),
-            )
-            sem = asyncio.Semaphore(2)
-            await download_content_and_index(
-                "big.bin",
-                "http://b.example.com",
-                sem,
-                add_fn,
-            )
-
-        assert indexed == []
-
-    async def test_small_text_indexed(self):
-        indexed = []
-
-        async def add_fn(bucket, path, content):
-            indexed.append((bucket, path, content))
-
-        with respx.mock:
-            respx.get(url__startswith="http://b.example.com").mock(
-                return_value=Response(200, content=b"hello world"),
-            )
-            sem = asyncio.Semaphore(2)
-            await download_content_and_index(
-                "notes.txt",
-                "http://b.example.com",
-                sem,
-                add_fn,
-            )
-
-        assert len(indexed) == 1
-        assert indexed[0][2] == b"hello world"
-
-    async def test_non_200_skipped(self):
-        indexed = []
-
-        async def add_fn(bucket, path, content):
-            indexed.append((bucket, path, content))
-
-        with respx.mock:
-            respx.get(url__startswith="http://b.example.com").mock(
-                return_value=Response(403),
-            )
-            sem = asyncio.Semaphore(2)
-            await download_content_and_index(
-                "denied.txt",
-                "http://b.example.com",
-                sem,
-                add_fn,
-            )
-
-        assert indexed == []
 
 
 class TestAnalyzeErrorLogging:

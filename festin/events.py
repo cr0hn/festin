@@ -5,7 +5,7 @@ import json
 
 import aiofiles
 
-from .s3 import S3Bucket, download_s3_objects
+from .s3 import S3Bucket
 
 STOP_KEYWORD = "########STOP########"
 
@@ -37,22 +37,6 @@ async def on_domain_save_new_domains(
 
     async with aiofiles.open(file_name, mode="a") as f:
         await f.write(f"{domain}\n")
-
-
-async def on_results_add_to_redis(cli_args, bucket: S3Bucket):
-    from .redis import redis_add_document, redis_create_connection
-
-    print(f"    >> Indexing content for '{bucket.domain}'")
-
-    redis_con = await redis_create_connection(cli_args.index_server)
-
-    async def fulltext_add_fn(bucket_name, object_path, content):
-        await redis_add_document(redis_con, bucket_name, object_path, content)
-
-    try:
-        await download_s3_objects(bucket, fulltext_add_fn)
-    finally:
-        await redis_con.aclose()
 
 
 async def on_domain_event(
@@ -94,6 +78,5 @@ __all__ = (
     "on_domain_save_new_domains",
     "on_result_print_results",
     "on_result_save_streaming_results",
-    "on_results_add_to_redis",
     "STOP_KEYWORD",
 )
