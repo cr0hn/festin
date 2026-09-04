@@ -15,7 +15,44 @@
   <a href="https://docs.astral.sh/ruff/"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
 </p>
 
+
 ---
+
+## Table of contents
+
+- [What is FestIn](#what-is-festin)
+- [Why FestIn](#why-festin)
+- [Install](#install)
+  - [uv (recommended)](#uv-recommended)
+  - [pip](#pip)
+  - [Docker](#docker)
+- [Quick start](#quick-start)
+- [User guide](#user-guide)
+  - [Basic scan](#basic-scan)
+  - [Watch mode](#watch-mode)
+  - [Crawl and DNS options](#crawl-and-dns-options)
+  - [Black and white lists](#black-and-white-lists)
+  - [Results files](#results-files)
+  - [Permutations and wordlists](#permutations-and-wordlists)
+  - [Multi-cloud probing](#multi-cloud-probing)
+  - [Secrets detection](#secrets-detection)
+  - [Monitoring with state and diff](#monitoring-with-state-and-diff)
+  - [Checkpoint and resume](#checkpoint-and-resume)
+  - [Rate profiles](#rate-profiles)
+  - [Exports](#exports)
+  - [Tor](#tor)
+- [REST API](#rest-api)
+  - [Endpoints](#endpoints)
+  - [curl examples](#curl-examples)
+  - [Python example](#python-example)
+- [CLI reference](#cli-reference)
+  - [`festin scan`](#festin-scan)
+  - [`festin serve`](#festin-serve)
+  - [`festin version`](#festin-version)
+- [Development](#development)
+- [FAQ](#faq)
+- [License](#license)
+
 
 ## What is FestIn
 
