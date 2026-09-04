@@ -11,7 +11,7 @@
 <p align="center">
   <a href="#development"><img src="https://img.shields.io/badge/CI-GitHub_Actions-blue" alt="CI"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.13%2B-blue" alt="Python 3.13+"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-green" alt="License: BSD-3-Clause"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Dual--Personal%2FCommercial-green" alt="License: Personal and Commercial"></a>
   <a href="https://docs.astral.sh/ruff/"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
 </p>
 
@@ -437,4 +437,11 @@ critical findings is a good failure signal for the pipeline.
 
 ## License
 
-BSD-3-Clause. See [LICENSE](LICENSE).
+Free and open for **personal and professional use** — no cost, no restrictions
+on what you use it for.
+
+If you want to build a **paid service or commercial product around FestIn**
+(SaaS, managed offering, redistribution as part of a paid platform...), get in
+touch first: that use case is **paid**. Contact: [cr0hn@cr0hn.com](mailto:cr0hn@cr0hn.com).
+
+See [LICENSE](LICENSE) for the full terms.
