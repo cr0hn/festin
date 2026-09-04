@@ -155,7 +155,7 @@ async def probe_candidates(cli_args: argparse.Namespace, candidates: list[str]) 
 
 def _print_candidate_buckets(buckets: list[S3Bucket]) -> None:
     for bucket in buckets:
-        print(f"[{core.PB}] Found '{len(bucket.objects)}' objects at bucket '{bucket.bucket_name}'")
+        print(f"[[[FOUND]]] Found '{len(bucket.objects)}' objects at bucket '{bucket.bucket_name}'")
 
 
 async def run_domains(cli_args: argparse.Namespace, domains: list[str]) -> None:
