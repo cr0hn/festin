@@ -49,6 +49,8 @@
   - [`festin scan`](#festin-scan)
   - [`festin serve`](#festin-serve)
   - [`festin version`](#festin-version)
+- [What's new in 0.2.0](#whats-new-in-020)
+- [Changelog](#changelog)
 - [Development](#development)
 - [FAQ](#faq)
 - [License](#license)
@@ -471,6 +473,84 @@ by `festin scan --state`. See the REST API section.
 **Can I run scans from CI?**
 Yes — use `--state` + `--diff` + `--export sarif`. A non-empty diff or new
 critical findings is a good failure signal for the pipeline.
+
+
+## What's new in 0.2.0
+
+The biggest release since the project started. FestIn grew from a single-run
+CLI scanner into a monitorable, multi-cloud discovery platform:
+
+- **New CLI** — rewritten with [Typer](https://typer.tiangolo.com/): typed
+  options, rich help panels, `scan` / `serve` / `version` commands. All the
+  classic flags are still there. `python -m festin` works as before.
+- **Multi-cloud probing** (`--cloud`) — every candidate bucket name is tested
+  against AWS S3, Azure Blob, Google Cloud Storage, DigitalOcean Spaces and
+  Backblaze B2, concurrently.
+- **Bucket-name permutations** (`--permute`, `--wordlist`) — expands domains
+  into thousands of candidate names with environment suffixes
+  (`-prod`, `-backup`, `-staging`...) and merges custom wordlists.
+- **Secrets detection** (`--secrets`) — downloads text objects from discovered
+  buckets and reports AWS/GCP/Azure credentials, private keys, JWTs, GitHub,
+  Slack tokens and more, with severity ratings and redacted output.
+- **Scan state and diffing** (`--state`, `--diff`) — every scan persists to a
+  JSON state file; the next run reports *new buckets, removed buckets and
+  object changes* since the previous scan.
+- **Checkpoint / resume** (`--checkpoint`, `--resume`) — atomic per-domain
+  checkpointing; interrupted scans pick up where they stopped.
+- **Rate profiles** (`--profile fast|deep|stealth`) — token-bucket rate
+  limiting with adaptive backoff on 429/403/5xx and optional jitter.
+- **REST API** (`festin serve`) — query scans, buckets and findings over
+  `/api/v1` for dashboards and CI integrations.
+- **Structured exports** (`--export csv|sarif|jsonl`) — SIEM-ready output,
+  including valid SARIF 2.1.0.
+- **Removed**: Redis Search indexing (`--index`) and the download machinery
+  that fed it. Results now live in portable JSON state files instead.
+
+## Changelog
+
+### 0.2.0 — 2026-09-04
+
+#### Added
+
+- Typer-based CLI with `scan`, `serve` and `version` commands; bare
+  `festin example.com` still routes to `scan`.
+- `--cloud` multi-cloud bucket probing (AWS, Azure, GCS, DigitalOcean,
+  Backblaze).
+- `--permute` and `--wordlist` bucket-name permutation engine.
+- `--secrets` content classification: 13 built-in rules (AWS, Google, Azure,
+  SSH private keys, JWT, GitHub, Slack, connection strings, `.env`), findings
+  redacted and deduplicated with line numbers.
+- `--state` scan persistence with a versioned JSON schema (`festin/v1`).
+- `--diff` report of new/removed buckets and per-bucket object changes
+  against the previous stored scan.
+- `--checkpoint` / `--resume` atomic resumable scans.
+- `--profile fast|deep|stealth` with adaptive rate limiting and jitter.
+- `--export csv|sarif|jsonl` structured output exporters.
+- `festin serve` REST API (`/api/v1/health`, `/scans`, `/findings`,
+  `/buckets`) exposing persisted state.
+- 269 tests covering the full feature set; complexity gate (max 20 per
+  function) enforced with radon + ruff mccabe in CI.
+
+#### Changed
+
+- CLI rewritten with Typer; all legacy flags preserved (`-f`, `-w`, `-c`,
+  `-T`, `-M`, `-dr`, `-B`, `-W`, `-rr`, `-rd`, `-ra`, `--tor`, `-ds`, ...).
+- Packaging migrated to `pyproject.toml` + `uv` with hatchling; CI runs
+  lint, format, complexity gate, tests, build and smoke checks.
+- License: free for personal and professional use; hosted/paid services and
+  commercial redistribution require a commercial agreement.
+
+#### Removed
+
+- Redis Search indexing feature (`--index`, `--index-server`) and the object
+  download machinery that fed it (BREAKING; superseded by `--state`).
+- `setup.py` / `setup.cfg` / `requirements.txt` / `MANIFEST.in` /
+  `VERSION` packaging relics.
+
+### 0.1.0 — 2021 (historical)
+
+- Initial release: crawler + DNS + S3 probing pipeline, watch mode, Tor
+  support, Redis Search indexing, black/white list domain filters.
 
 ## License
 
