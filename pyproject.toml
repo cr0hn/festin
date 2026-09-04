@@ -14,6 +14,7 @@ dependencies = [
     "dnspython>=2.7",
     "httpx[socks]>=0.28",
     "lxml>=6.0",
+    "typer>=0.12",
     "watchfiles>=1.1",
 ]
 classifiers = [
@@ -25,7 +26,7 @@ classifiers = [
 Homepage = "https://github.com/cr0hn/festin"
 
 [project.scripts]
-festin = "festin.__main__:main"
+festin = "festin.cli:main"
 
 [dependency-groups]
 dev = [
@@ -57,6 +58,9 @@ timeout = 60
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]

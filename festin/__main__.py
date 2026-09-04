@@ -1,15 +1,17 @@
-"""Festin CLI entrypoint and async orchestration."""
+"""Core scan pipeline: queues, consumers and per-domain analysis.
+
+The user-facing CLI lives in :mod:`festin.cli`; ``python -m festin``
+delegates there. Feature wiring (profiles, permutations, checkpointing,
+secrets, state/diff, exports) lives in :mod:`festin.scan_runner`.
+"""
 
 import argparse
 import asyncio
-import os
-import re
 from dataclasses import dataclass
 
 import aiofiles
 import watchfiles
 
-import festin
 from festin.analysis import check_tor_connection, get_dns_info, get_links, get_s3
 from festin.events import STOP_KEYWORD, on_domain_event, on_result_event
 from festin.utils import valid_domain_or_link
@@ -136,28 +138,25 @@ class _DomainFilters:
     white_list: list[str]
     processed: set[str]
 
-    def reject(self, domain: str) -> bool:
-        if not domain or domain in self.processed:
-            return True
+    def _unwanted(self, domain: str) -> bool:
+        """Already processed, empty, or in the built-in blacklist."""
+        return not domain or domain in self.processed or valid_domain_or_link(domain)
 
-        # Built-in blacklist (CDNs, social networks, ...) is a hard filter;
-        # the caller prints the reason.
-        if valid_domain_or_link(domain):
-            return True
-
-        self.processed.add(domain)
-
+    def _filtered_out(self, domain: str) -> bool:
+        """User filters: regex, blacklist membership, whitelist mismatch."""
         regex = self.cli_args.domain_regex
         if regex and not regex.search(domain):
             return True
-
         if self.black_list and domain in self.black_list:
             return True
+        return bool(self.white_list) and domain not in self.white_list
 
-        if self.white_list and domain not in self.white_list:
+    def reject(self, domain: str) -> bool:
+        if self._unwanted(domain):
             return True
 
-        return False
+        self.processed.add(domain)
+        return self._filtered_out(domain)
 
 
 async def _next_queue_item(
@@ -301,7 +300,7 @@ async def run(cli_args: argparse.Namespace, init_domains: list[str]):
 
 
 def _build_result_consumers(cli_args: argparse.Namespace) -> list:
-    """Result consumers: streaming file, printing."""
+    """Result consumers: streaming file, printing, optional collection."""
     consumers = []
 
     if not cli_args.result_file:
@@ -311,7 +310,16 @@ def _build_result_consumers(cli_args: argparse.Namespace) -> list:
     if not cli_args.no_print or not cli_args.quiet:
         consumers.append(_print_results_consumer)
 
+    collector = getattr(cli_args, "collect_buckets", None)
+    if collector is not None:
+        consumers.append(_collecting_consumer)
+
     return consumers
+
+
+async def _collecting_consumer(cli_args, bucket):
+    """Append the bucket to cli_args.collect_buckets for the scan runner."""
+    cli_args.collect_buckets.append(bucket)
 
 
 def _build_domain_consumers(file_name: str | None) -> list:
@@ -389,237 +397,11 @@ async def _save_domains_consumer(cli_args, domain, file_name, initial_domains):
     )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Festin - the powered S3 bucket finder and content discover",
-    )
-
-    parser.add_argument("domains", nargs="*")
-    parser.add_argument(
-        "--version",
-        action="store_true",
-        default=False,
-        help="show version",
-    )
-    parser.add_argument(
-        "-f",
-        "--file-domains",
-        default=None,
-        help="file with domains",
-    )
-    parser.add_argument(
-        "-w",
-        "--watch",
-        action="store_true",
-        default=False,
-        help="watch for new domains in file domains '-f' option",
-    )
-    parser.add_argument(
-        "-c",
-        "--concurrency",
-        default=5,
-        type=int,
-        help="max concurrency",
-    )
-
-    group_http = parser.add_argument_group("HTTP Probes")
-    group_http.add_argument(
-        "--no-links",
-        action="store_false",
-        default=False,
-        help="extract web site links",
-    )
-    group_http.add_argument(
-        "-T",
-        "--http-timeout",
-        type=float,
-        default=5,
-        help="set timeout for http connections",
-    )
-    group_http.add_argument(
-        "-M",
-        "--http-max-recursion",
-        type=int,
-        default=3,
-        help="maximum recursion when follow links",
-    )
-
-    group_filtering = parser.add_argument_group("filtering")
-    group_filtering.add_argument(
-        "-dr",
-        "--domain-regex",
-        default=None,
-        help="only follow domains that matches this regex",
-    )
-    group_filtering.add_argument(
-        "-B",
-        "--domain-black-list",
-        default=None,
-        help="load a file with a black list words",
-    )
-    group_filtering.add_argument(
-        "-W",
-        "--domain-white-list",
-        default=None,
-        help="load a file with a white list words",
-    )
-
-    group_results = parser.add_argument_group("results")
-    group_results.add_argument(
-        "-rr",
-        "--result-file",
-        default=None,
-        help="results file",
-    )
-    group_results.add_argument(
-        "-rd",
-        "--discovered-domains",
-        default=None,
-        help="file name for storing new discovered after apply filters",
-    )
-    group_results.add_argument(
-        "-ra",
-        "--raw-discovered-domains",
-        default=None,
-        help="file name for storing any domain without filters",
-    )
-
-    group_conn = parser.add_argument_group("Connectivity")
-    group_conn.add_argument(
-        "--tor",
-        default=None,
-        action="store_true",
-        help="Use Tor as proxy",
-    )
-
-    group_display = parser.add_argument_group("Display options")
-    group_display.add_argument(
-        "--debug",
-        default=False,
-        action="store_true",
-        help="enable debug mode",
-    )
-    group_display.add_argument(
-        "--no-print",
-        default=False,
-        action="store_true",
-        help="doesn't print results in screen",
-    )
-    group_display.add_argument(
-        "-q",
-        "--quiet",
-        default=False,
-        action="store_true",
-        help="Use quiet mode",
-    )
-
-    group_dns = parser.add_argument_group("DNS options")
-    group_dns.add_argument(
-        "-dn",
-        "--no-dnsdiscover",
-        action="store_false",
-        default=False,
-        help="not follow dns cnames",
-    )
-    group_dns.add_argument(
-        "-ds",
-        "--dns-resolver",
-        default=None,
-        help="comma separated custom domain name servers",
-    )
-
-    return parser
-
-
 def main():
-    parsed = build_parser().parse_args()
+    """Entry point: delegate to the typer CLI in festin.cli."""
+    from festin.cli import main as cli_main
 
-    if not parsed.quiet:
-        print(festin.LOGO)
-
-    if parsed.version:
-        print(f"version: {festin.__version__}")
-        print()
-        raise SystemExit(0)
-
-    _warn_if_no_regex(parsed)
-
-    domains = _collect_domains(parsed)
-    if not domains:
-        print("[!] You must provide at least one domain")
-        raise SystemExit(1)
-
-    _validate_options(parsed)
-
-    if not parsed.quiet:
-        print("[*] Starting FestIN")
-
-    try:
-        asyncio.run(run(parsed, domains))
-    except KeyboardInterrupt:
-        print("[*] Stopping Festin")
-
-
-def _warn_if_no_regex(parsed: argparse.Namespace) -> None:
-    if not parsed.domain_regex:
-        print()
-        print("#" * 50)
-        print("#                                                #")
-        print("#   IT'S VERY IMPORTANT TO CONFIGURE A DOMAIN    #")
-        print("#   REGEX (Option '-dr'). OTHERWISE CRAWLER      #")
-        print("#   WILL FOLLOW ANY LINK NO MATTER WHERE THEY    #")
-        print("#   POINT TO                                     #")
-        print("#                                                #")
-        print("#" * 50)
-        print()
-
-
-def _collect_domains(parsed: argparse.Namespace) -> list[str]:
-    """Gather domains from CLI args and the domains file, de-duplicated."""
-    domains = list(parsed.domains)
-
-    if parsed.file_domains:
-        print(f"[*] Loading '{parsed.file_domains}' file")
-        with open(parsed.file_domains) as f:
-            domains.extend(f.read().splitlines())
-
-    return list(set(domains))
-
-
-def _validate_options(parsed: argparse.Namespace) -> None:
-    """Fail fast on invalid option combinations."""
-    _compile_domain_regex(parsed)
-    _check_list_options(parsed)
-
-
-def _compile_domain_regex(parsed: argparse.Namespace) -> None:
-    if not parsed.domain_regex:
-        return
-
-    try:
-        parsed.domain_regex = re.compile(parsed.domain_regex)
-    except re.error as e:
-        print(f"Invalid regex! You must use a valid regex: {e}")
-        raise SystemExit(1) from e
-
-
-def _check_list_options(parsed: argparse.Namespace) -> None:
-    if parsed.domain_black_list and parsed.domain_white_list:
-        print("[!] Black list option and White list option are incompatible.")
-        raise SystemExit(1)
-
-    for option, label in (
-        ("domain_black_list", "Black list"),
-        ("domain_white_list", "White list"),
-    ):
-        path = getattr(parsed, option)
-        if path and not os.path.exists(path):
-            print(f"[!] {label} doesn't exist: '{path}'")
-            raise SystemExit(1)
-
-    if parsed.watch and not parsed.file_domains:
-        print("[!] For running in 'Watch' mode you must set a domains file ('-f' option)")
-        raise SystemExit(1)
+    cli_main()
 
 
 if __name__ == "__main__":

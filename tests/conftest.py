@@ -28,6 +28,22 @@ def make_cli_args(**overrides) -> argparse.Namespace:
         "quiet": True,
         "no_dnsdiscover": False,
         "dns_resolver": None,
+        "profile": None,
+        "permute": False,
+        "wordlist": None,
+        "cloud": False,
+        "scan_id": None,
+        "state_file": None,
+        "diff": False,
+        "secrets": False,
+        "checkpoint": None,
+        "resume": False,
+        "export": None,
+        "output": None,
+        "rate": None,
+        "rate_jitter": 0.0,
+        "rate_controller": None,
+        "collect_buckets": None,
     }
     defaults.update(overrides)
     return argparse.Namespace(**defaults)
