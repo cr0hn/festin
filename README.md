@@ -528,8 +528,8 @@ CLI scanner into a monitorable, multi-cloud discovery platform:
 - `--export csv|sarif|jsonl` structured output exporters.
 - `festin serve` REST API (`/api/v1/health`, `/scans`, `/findings`,
   `/buckets`) exposing persisted state.
-- 269 tests covering the full feature set; complexity gate (max 20 per
-  function) enforced with radon + ruff mccabe in CI.
+- Full test suite covering the new feature modules; cyclomatic complexity
+  gate (max 20 per function) enforced in CI with radon and ruff mccabe.
 
 #### Changed
 
