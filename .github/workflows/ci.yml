@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: |
+          uv run ruff check festin tests
+          uv run ruff format --check festin tests
+
+      - name: Complexity gate (McCabe, max 10)
+        run: uv run radon cc festin -n C --total-average
+
+      - name: Tests
+        run: uv run pytest -v
+
+      - name: Smoke test
+        run: uv run python -m festin --help
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: Build distributions
+        run: uv build
+      - name: Publish to PyPI
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.pypi_password }}

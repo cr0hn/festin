@@ -1,93 +1,99 @@
-import json
-import asyncio
-import argparse
+"""Event handlers for results and discovered domains."""
 
-from typing import List, Tuple
-from functools import partial
+import asyncio
+import json
 
 import aiofiles
 
-from .s3 import download_s3_objects, S3Bucket
-from .redis import redis_create_connection, redis_add_document
+from .s3 import S3Bucket, download_s3_objects
 
 STOP_KEYWORD = "########STOP########"
 
 
-async def on_result_print_results(cli_args, bucket):
+async def on_result_print_results(cli_args, bucket: S3Bucket):
+    print(f"[[[FOUND]]] '{bucket.domain}' - Found {len(bucket.objects)} public objects")
 
-    try:
-        print(f"[[[FOUND]]]] '{bucket.domain}' - Found {len(bucket.objects)}"
-              f"public objects")
+    if cli_args.debug:
+        for obj in bucket.objects:
+            print(f"        -> {bucket.domain}/{obj}")
 
-        if cli_args.debug:
-            for obj in bucket.objects:
-                print(f"        -> {bucket.domain}/{obj}")
-
-    finally:
-        if not bucket.objects:
-            print(f"    *> '{bucket.domain}' - Found {len(bucket.objects)}")
+    if not bucket.objects:
+        print(f"    *> '{bucket.domain}' - Found 0 objects")
 
 
-async def on_result_save_streaming_results(cli_args, bucket):
-    async with aiofiles.open(cli_args.result_file, mode='a+') as f:
+async def on_result_save_streaming_results(cli_args, bucket: S3Bucket):
+    async with aiofiles.open(cli_args.result_file, mode="a") as f:
         await f.write(f"{json.dumps(bucket.__dict__)}\n")
 
 
-async def on_domain_save_new_domains(cli_args,
-                                     domain: str,
-                                     file_name: str,
-                                     initial_domains: List[str]):
-
+async def on_domain_save_new_domains(
+    cli_args,
+    domain: str,
+    file_name: str,
+    initial_domains: list[str] | None,
+):
     if initial_domains and domain in initial_domains:
         return
 
-    async with aiofiles.open(file_name, mode='a+') as f:
+    async with aiofiles.open(file_name, mode="a") as f:
         await f.write(f"{domain}\n")
 
 
-async def on_results_add_to_redis(
-        cli_args: argparse.Namespace,
-        bucket: S3Bucket):
+async def on_results_add_to_redis(cli_args, bucket: S3Bucket):
+    from .redis import redis_add_document, redis_create_connection
 
     print(f"    >> Indexing content for '{bucket.domain}'")
+
     redis_con = await redis_create_connection(cli_args.index_server)
 
-    fulltext_add_fn = partial(redis_add_document, redis_con)
+    async def fulltext_add_fn(bucket_name, object_path, content):
+        await redis_add_document(redis_con, bucket_name, object_path, content)
 
-    await download_s3_objects(bucket, fulltext_add_fn)
+    try:
+        await download_s3_objects(bucket, fulltext_add_fn)
+    finally:
+        await redis_con.aclose()
 
 
-
-async def on_domain_event(cli_args,
-                          domain_queue: asyncio.Queue,
-                          initial_domains: List or None,
-                          consumers: List[Tuple]):
+async def on_domain_event(
+    cli_args,
+    domain_queue: asyncio.Queue,
+    initial_domains: list[str] | None,
+    consumers: list,
+):
+    """Consume domain events until STOP_KEYWORD arrives."""
     while True:
-
         domain = await domain_queue.get()
 
         if domain == STOP_KEYWORD:
             break
 
-        for fn, filename in consumers:
-            await fn(cli_args, domain, filename, initial_domains)
+        for consumer, filename in consumers:
+            await consumer(cli_args, domain, filename, initial_domains)
 
 
-async def on_result_event(cli_args,
-                          results_queue: asyncio.Queue,
-                          consumers: List):
-
+async def on_result_event(
+    cli_args,
+    results_queue: asyncio.Queue,
+    consumers: list,
+):
+    """Consume result events until STOP_KEYWORD arrives."""
     while True:
-
         bucket = await results_queue.get()
 
         if bucket == STOP_KEYWORD:
             return
 
-        for c in consumers:
-            await c(cli_args, bucket)
+        for consumer in consumers:
+            await consumer(cli_args, bucket)
 
 
-__all__ = ("on_result_event", "on_domain_event", "on_domain_save_new_domains",
-           "on_result_print_results", "on_result_save_streaming_results",
-           "on_results_add_to_redis", "STOP_KEYWORD")
+__all__ = (
+    "on_result_event",
+    "on_domain_event",
+    "on_domain_save_new_domains",
+    "on_result_print_results",
+    "on_result_save_streaming_results",
+    "on_results_add_to_redis",
+    "STOP_KEYWORD",
+)

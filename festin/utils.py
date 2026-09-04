@@ -1,16 +1,30 @@
-from colorama import Fore, Back, Style
+"""Domain validation helpers."""
 
-from .black_list import *
+from colorama import Fore, Style
+
+from .black_list import (
+    BLACK_LIST_DOMAINS,
+    BLACK_LIST_FLD,
+    BLACK_LIST_PREFIXES,
+)
 
 
-def valid_domain_or_link(domain_or_link: str) -> None or str:
+def _matches_fld(domain: str, fld: str) -> bool:
+    """True if domain IS the FLD or a subdomain of it (label-boundary)."""
+    return domain == fld or domain.endswith(f".{fld}")
+
+
+def valid_domain_or_link(domain_or_link: str) -> str | None:
+    """Return a skip reason if the domain is blacklisted, else None."""
     colored_prefix = f"{Fore.YELLOW}SKIP{Style.RESET_ALL}"
-    if any(domain_or_link.endswith(d) for d in BLACK_LIST_FLD):
-        return f"[{colored_prefix}] domain '{domain_or_link}' is in blacklist"
 
-    if any(domain_or_link.startswith(d) for d in BLACK_LIST_PREFISES):
-        return f"[{colored_prefix}] domain '{domain_or_link}' has a prefix " \
-               f"blacklisted"
+    for fld in BLACK_LIST_FLD:
+        if _matches_fld(domain_or_link, fld):
+            return f"[{colored_prefix}] domain '{domain_or_link}' is in blacklist"
+
+    for prefix in BLACK_LIST_PREFIXES:
+        if domain_or_link.startswith(f"{prefix}."):
+            return f"[{colored_prefix}] domain '{domain_or_link}' has a prefix blacklisted"
 
     if domain_or_link in BLACK_LIST_DOMAINS:
         return f"[{colored_prefix}] domain '{domain_or_link}' is in blacklist"

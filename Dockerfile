@@ -1,13 +1,22 @@
-FROM python:3.8-slim as builder
+FROM python:3.13-slim AS builder
 
-COPY . /festin
-RUN pip wheel --no-cache-dir --wheel-dir=/root/wheels -r /festin/requirements.txt \
-    &&  pip wheel --no-cache-dir --wheel-dir=/root/wheels /festin
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-FROM python:3.8-slim-buster
-COPY --from=builder /root/wheels /root/wheels
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
-RUN python -m pip install --no-cache-dir --no-cache /root/wheels/* \
-    && rm -rf /root/wheels
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --no-dev
+
+COPY festin ./festin
+RUN uv sync --frozen --no-dev
+
+FROM python:3.13-slim
+
+COPY --from=builder /app /app
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 ENTRYPOINT ["festin"]

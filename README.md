@@ -63,9 +63,23 @@ Main features that does `Festin` great:
 
 ## Install
 
-### Using Python
+### Using uv (recommended)
 
-    Python 3.8 of above needed!
+    Python 3.13 or above needed!
+
+```bash
+$ uv tool install festin
+$ festin -h
+```
+
+Or, from a source checkout:
+
+```bash
+$ uv sync
+$ uv run festin -h
+```
+
+### Using pip
 
 ```bash
 $ pip install festin
@@ -78,43 +92,63 @@ $ festin -h
 $ docker run --rm -it cr0hn/festin -h
 ```
 
+## Development
+
+```bash
+$ uv sync           # install runtime + dev dependencies
+$ uv run pytest     # unit + e2e + smoke tests
+$ uv run ruff check festin tests && uv run ruff format --check festin tests
+$ uv run radon cc festin -n C --total-average   # complexity gate (max 10)
+```
+
 ## Full options
 
 ```bash
 $ festin -h
-usage: __main__.py [-h] [--version] [-f FILE_DOMAINS] [-w] [-c CONCURRENCY] [--no-links] [-T HTTP_TIMEOUT] [-M HTTP_MAX_RECURSION] [-dr DOMAIN_REGEX] [-rr RESULT_FILE] [-rd DISCOVERED_DOMAINS] [-ra RAW_DISCOVERED_DOMAINS]
-                   [--tor] [--debug] [--no-print] [-q] [--index] [--index-server INDEX_SERVER] [-dn] [-ds DNS_RESOLVER]
-                   [domains [domains ...]]
+usage: festin [-h] [--version] [-f FILE_DOMAINS] [-w] [-c CONCURRENCY]
+              [--no-links] [-T HTTP_TIMEOUT] [-M HTTP_MAX_RECURSION]
+              [-dr DOMAIN_REGEX] [-B DOMAIN_BLACK_LIST] [-W DOMAIN_WHITE_LIST]
+              [-rr RESULT_FILE] [-rd DISCOVERED_DOMAINS]
+              [-ra RAW_DISCOVERED_DOMAINS] [--tor] [--debug] [--no-print] [-q]
+              [--index] [--index-server INDEX_SERVER] [-dn] [-ds DNS_RESOLVER]
+              [domains ...]
 
 Festin - the powered S3 bucket finder and content discover
 
 positional arguments:
   domains
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --version             show version
-  -f FILE_DOMAINS, --file-domains FILE_DOMAINS
+  -f, --file-domains FILE_DOMAINS
                         file with domains
   -w, --watch           watch for new domains in file domains '-f' option
-  -c CONCURRENCY, --concurrency CONCURRENCY
+  -c, --concurrency CONCURRENCY
                         max concurrency
 
 HTTP Probes:
   --no-links            extract web site links
-  -T HTTP_TIMEOUT, --http-timeout HTTP_TIMEOUT
+  -T, --http-timeout HTTP_TIMEOUT
                         set timeout for http connections
-  -M HTTP_MAX_RECURSION, --http-max-recursion HTTP_MAX_RECURSION
-                        maximum recursison when follow links
-  -dr DOMAIN_REGEX, --domain-regex DOMAIN_REGEX
-                        only follow domains that matches this regex
+  -M, --http-max-recursion HTTP_MAX_RECURSION
+                        maximum recursion when follow links
 
-Results:
-  -rr RESULT_FILE, --result-file RESULT_FILE
+filtering:
+  -dr, --domain-regex DOMAIN_REGEX
+                        only follow domains that matches this regex
+  -B, --domain-black-list DOMAIN_BLACK_LIST
+                        load a file with a black list words
+  -W, --domain-white-list DOMAIN_WHITE_LIST
+                        load a file with a white list words
+
+results:
+  -rr, --result-file RESULT_FILE
                         results file
-  -rd DISCOVERED_DOMAINS, --discovered-domains DISCOVERED_DOMAINS
-                        file name for storing new discovered after apply filters
-  -ra RAW_DISCOVERED_DOMAINS, --raw-discovered-domains RAW_DISCOVERED_DOMAINS
+  -rd, --discovered-domains DISCOVERED_DOMAINS
+                        file name for storing new discovered after apply
+                        filters
+  -ra, --raw-discovered-domains RAW_DISCOVERED_DOMAINS
                         file name for storing any domain without filters
 
 Connectivity:
@@ -128,12 +162,12 @@ Display options:
 Redis Search:
   --index               Download and index documents into Redis
   --index-server INDEX_SERVER
-                        Redis Search ServerDefault: redis://localhost:6379
+                        Redis Search Server. Default: redis://localhost:6379
 
 DNS options:
   -dn, --no-dnsdiscover
                         not follow dns cnames
-  -ds DNS_RESOLVER, --dns-resolver DNS_RESOLVER
+  -ds, --dns-resolver DNS_RESOLVER
                         comma separated custom domain name servers
 ```
 
