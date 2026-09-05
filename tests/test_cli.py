@@ -32,10 +32,12 @@ class TestHelpAndBasics:
         assert "scan" in _clean(result.output)
         assert "serve" in _clean(result.output)
 
-    def test_scan_help_lists_all_flags(self):
-        result = _invoke("scan", "--help")
+    def test_scan_lists_all_flags(self):
+        """All scan flags exist on the command model (render-independent)."""
+        import typer.main
 
-        assert result.exit_code == 0
+        scan = typer.main.get_command(app).commands["scan"]
+        opts = {o for p in scan.params for o in p.opts}
         for flag in (
             "--file-domains",
             "--watch",
@@ -46,7 +48,7 @@ class TestHelpAndBasics:
             "--domain-white-list",
             "--result-file",
             "--discovered-domains",
-            "--raw-discovered",  # rich may truncate long flags in the panel
+            "--raw-discovered-domains",
             "--tor",
             "--no-dnsdiscover",
             "--dns-resolver",
@@ -62,14 +64,26 @@ class TestHelpAndBasics:
             "--resume",
             "--export",
         ):
-            assert flag in _clean(result.output), f"missing flag {flag}"
+            assert flag in opts, f"missing flag {flag}"
+
+        # The rendered help is a rich panel whose width depends on the
+        # terminal; only assert on things that never wrap or elide.
+        result = _invoke("scan", "--help")
+        assert result.exit_code == 0
+        assert "scan" in _clean(result.output)
 
     def test_serve_help_documents_fallback(self):
-        result = _invoke("serve", "--help")
+        import typer.main
 
+        serve = typer.main.get_command(app).commands["serve"]
+        opts = {o for p in serve.params for o in p.opts}
+        assert "--host" in opts
+        assert "--port" in opts
+        assert "--state" in opts
+
+        result = _invoke("serve", "--help")
         assert result.exit_code == 0
         assert "503" in _clean(result.output)
-        assert "--state" in _clean(result.output)
 
     def test_version_command(self):
         result = _invoke("version")

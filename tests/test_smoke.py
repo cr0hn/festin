@@ -6,6 +6,7 @@ are pure argument validation.
 """
 
 import os
+import re
 import subprocess
 import sys
 
@@ -29,8 +30,9 @@ class TestCLISmoke:
 
         assert proc.returncode == 0
         assert "Festin" in proc.stdout
-        assert "--concurrency" in proc.stdout
-        assert "--tor" in proc.stdout
+        out = re.sub(r"\x1b\[[0-9;]*m", "", proc.stdout)
+        assert "--concurrency" in out
+        assert "--tor" in out
 
     def test_version_flag(self):
         proc = _run_festin("--version", "-q")
