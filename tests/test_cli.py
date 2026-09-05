@@ -1,6 +1,7 @@
 """Tests for the typer CLI (festin.cli) and the scan runner wiring."""
 
 import json
+import re
 
 import httpx
 import pytest
@@ -18,13 +19,18 @@ def _invoke(*args: str):
     return runner.invoke(app, list(args))
 
 
+def _clean(s: str) -> str:
+    """Strip ANSI escapes (CI forces colors) and collapse panel padding."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", s)
+
+
 class TestHelpAndBasics:
     def test_top_level_help_renders_commands(self):
         result = _invoke("--help")
 
         assert result.exit_code == 0
-        assert "scan" in result.output
-        assert "serve" in result.output
+        assert "scan" in _clean(result.output)
+        assert "serve" in _clean(result.output)
 
     def test_scan_help_lists_all_flags(self):
         result = _invoke("scan", "--help")
@@ -56,26 +62,26 @@ class TestHelpAndBasics:
             "--resume",
             "--export",
         ):
-            assert flag in result.output, f"missing flag {flag}"
+            assert flag in _clean(result.output), f"missing flag {flag}"
 
     def test_serve_help_documents_fallback(self):
         result = _invoke("serve", "--help")
 
         assert result.exit_code == 0
-        assert "503" in result.output
-        assert "--state" in result.output
+        assert "503" in _clean(result.output)
+        assert "--state" in _clean(result.output)
 
     def test_version_command(self):
         result = _invoke("version")
 
         assert result.exit_code == 0
-        assert "version:" in result.output
+        assert "version:" in _clean(result.output)
 
     def test_version_flag_maps_to_version_command(self):
         result = _invoke("--version")
 
         assert result.exit_code == 0
-        assert "version:" in result.output
+        assert "version:" in _clean(result.output)
 
 
 class TestScanValidation:
@@ -83,37 +89,37 @@ class TestScanValidation:
         result = _invoke("scan", "-q")
 
         assert result.exit_code == 1
-        assert "at least one domain" in result.output
+        assert "at least one domain" in _clean(result.output)
 
     def test_unknown_profile_fails(self):
         result = _invoke("scan", "-q", "--profile", "bogus", "example.com")
 
         assert result.exit_code == 1
-        assert "Unknown profile" in result.output
+        assert "Unknown profile" in _clean(result.output)
 
     def test_diff_requires_state(self):
         result = _invoke("scan", "-q", "--diff", "example.com")
 
         assert result.exit_code == 1
-        assert "--diff requires --state" in result.output
+        assert "--diff requires --state" in _clean(result.output)
 
     def test_export_requires_output(self):
         result = _invoke("scan", "-q", "--export", "csv", "example.com")
 
         assert result.exit_code == 1
-        assert "--export requires --output" in result.output
+        assert "--export requires --output" in _clean(result.output)
 
     def test_unknown_export_format_fails(self):
         result = _invoke("scan", "-q", "--export", "yaml", "-o", "x.yaml", "example.com")
 
         assert result.exit_code == 1
-        assert "Unknown export format" in result.output
+        assert "Unknown export format" in _clean(result.output)
 
     def test_resume_requires_checkpoint(self):
         result = _invoke("scan", "-q", "--resume", "example.com")
 
         assert result.exit_code == 1
-        assert "--resume requires --checkpoint" in result.output
+        assert "--resume requires --checkpoint" in _clean(result.output)
 
     def test_black_and_white_lists_incompatible(self, tmp_path):
         bl = tmp_path / "bl.txt"
@@ -124,7 +130,7 @@ class TestScanValidation:
         result = _invoke("scan", "-q", "-B", str(bl), "-W", str(wl), "example.com")
 
         assert result.exit_code == 1
-        assert "incompatible" in result.output
+        assert "incompatible" in _clean(result.output)
 
 
 @pytest.fixture
@@ -208,7 +214,7 @@ class TestScanWithMockedPipeline:
         result = _invoke("scan", "--state", str(state), "--diff", "example.com")
 
         assert result.exit_code == 0
-        assert "new buckets" in result.output
+        assert "new buckets" in _clean(result.output)
 
     def test_wordlist_merges_candidates(self, fake_scan, monkeypatch, tmp_path):
         recorded, _bucket = fake_scan

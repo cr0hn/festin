@@ -31,9 +31,17 @@ jobs:
         run: uv run radon cc festin -n C --total-average
 
       - name: Tests
+        env:
+          NO_COLOR: "1"
+          COLUMNS: "200"
+          LINES: "200"
         run: uv run pytest -v
 
       - name: Smoke test
+        env:
+          NO_COLOR: "1"
+          COLUMNS: "200"
+          LINES: "200"
         run: uv run python -m festin --help
 
   build:

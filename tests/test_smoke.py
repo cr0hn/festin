@@ -13,7 +13,7 @@ import sys
 def _run_festin(
     *args: str, env_overrides: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess:
-    env = {**os.environ, **(env_overrides or {})}
+    env = {**os.environ, "NO_COLOR": "1", "COLUMNS": "200", **(env_overrides or {})}
     return subprocess.run(
         [sys.executable, "-m", "festin", *args],
         capture_output=True,
