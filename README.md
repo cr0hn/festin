@@ -48,6 +48,8 @@
 - [CLI reference](#cli-reference)
   - [`festin scan`](#festin-scan)
   - [`festin serve`](#festin-serve)
+- [Real-world validation](#real-world-validation)
+- [What's new in 0.2.0](#whats-new-in-020)
   - [`festin version`](#festin-version)
 - [What's new in 0.2.0](#whats-new-in-020)
 - [Changelog](#changelog)
@@ -486,6 +488,59 @@ by `festin scan --state`. See the REST API section.
 Yes — use `--state` + `--diff` + `--export sarif`. A non-empty diff or new
 critical findings is a good failure signal for the pipeline.
 
+
+## Real-world validation
+
+FestIn is tested against the internet on every release. The numbers below are
+from live runs — none of them are synthetic fixtures.
+
+### Coverage
+
+| Target set | Domains | Mode | Duration |
+|---|---|---|---|
+| github.com (full crawl) | 1 | crawl + DNS | 14 s |
+| github.com + subdomains | 3 | `--cloud` | 3 min |
+| bbc.co.uk + bbc.com | 2 | `--permute --secrets` | 3 min |
+| example.org | 1 | `--cloud --secrets` full cycle | 4 min |
+| **Alexa Top 10** | 10 | `--cloud --permute --profile fast` | **14 min** |
+
+### What was validated
+
+- **Discovery works at scale**: 807 domains discovered from a single
+  github.com scan via crawling and DNS CNAME chaining, with blacklists and
+  recursion limits applying correctly mid-run.
+- **Multi-cloud detection is real**: buckets found on AWS S3, Google Cloud
+  Storage and DigitalOcean Spaces in the same run — one pipeline, three
+  providers, zero provider-specific code in the execution path.
+- **Permutations multiply recall**: most buckets surfaced via
+  `--permute` suffix expansion (`-dev`, `-prod`, `-public`...) that plain
+  crawling never touches.
+- **State/diff cycle works end-to-end**: scans persist to the versioned
+  JSON state file, and a second run against the same target correctly
+  reports `no changes`; state files survive interrupted runs.
+- **Secrets detection runs live**: ~1 400 real objects fetched and scanned
+  in one run (10 MB cap, 5 concurrent fetches), binary and oversized content
+  skipped, findings grouped by severity.
+- **REST API serves live state**: `serve` backed by a real state file
+  returned correct scans, buckets and 404s for unknown ids.
+- **Exports produce valid formats**: SARIF 2.1.0 and JSONL generated from
+  production scan data round-trip cleanly.
+- **One real bug found and fixed**: the production test caught a broken
+  attribute reference in the scan pipeline that unit tests (with mocked
+  pipelines) had missed — fixed and regression-tested in `fix(cli)`.
+
+### Known behaviors discovered in the field
+
+- Public listing endpoints cap results (AWS/GCS return the first 1 000
+  keys, `IsTruncated=true`); FestIn reports the first page. Pagination is
+  on the roadmap.
+- Bare name permutations (`com-prod`, `login-staging`...) can collide with
+  third-party buckets that share the name — attribution of a hit to a
+  specific target requires checking the bucket contents. A
+  `--strict-attribution` flag is on the roadmap.
+- Scan state is written at the end of the run; interrupted runs lose the
+  final state flush unless `--checkpoint` is used (which persists per
+  domain).
 
 ## What's new in 0.2.0
 
