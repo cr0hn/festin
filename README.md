@@ -442,6 +442,20 @@ Options:
 
 Prints the installed version, e.g. `version: 0.1.0`.
 
+## Documentation
+
+Full documentation lives in the `docs/` site (MkDocs Material):
+
+```bash
+uv sync --group docs
+uv run mkdocs serve        # http://localhost:8000
+uv run mkdocs build        # static site in site/
+```
+
+Published topics: installation, quickstart, scanner CLI reference, dashboard
+tour, REST API, configuration, Docker/Kubernetes/HA deployment, security
+hardening, architecture, ADRs and runbook.
+
 ## Development
 
 ```bash

@@ -1,0 +1,119 @@
+site_name: FestIn
+site_description: S3 exposure scanner & multi-project monitoring dashboard
+site_author: cr0hn
+site_url: ""
+repo_url: https://github.com/cr0hn/festin
+repo_name: cr0hn/festin
+
+copyright: Copyright &copy; 2026 cr0hn
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.tracking
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.suggest
+    - search.highlight
+    - toc.follow
+  palette:
+    # Dark default — matches the dashboard ops console
+    - media: "(prefers-color-scheme: dark)"
+      scheme: festin-dark
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to light
+    - media: "(prefers-color-scheme: light)"
+      scheme: festin-light
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/toggle-switch-off-outline
+        icon: material/weather-sunny
+        icon: material/weather-night
+        icon: material/brightness-7
+        icon: material/brightness-4
+        toggle:
+          icon: material/weather-night
+          name: Switch to dark
+  font:
+    text: IBM Plex Mono
+    code: IBM Plex Mono
+  icon:
+    logo: material/shield-search
+    repo: fontawesome/brands/github
+  favicon: img/favicon.ico
+
+extra_css:
+  - css/festin.css
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Local usage: getting-started/local.md
+  - Usage:
+      - Scanner CLI: usage/scanner.md
+      - Dashboard: usage/dashboard.md
+      - REST API reference: usage/api.md
+      - Configuration: usage/configuration.md
+  - Deployment:
+      - Production (Docker): deploy/docker.md
+      - Kubernetes: deploy/kubernetes.md
+      - High availability: deploy/ha.md
+      - Security hardening: deploy/security.md
+  - Reference:
+      - Architecture: reference/architecture.md
+      - Design decisions (ADR): reference/design-decisions.md
+
+      - Runbook & troubleshooting: reference/runbook.md
+      - Development: reference/development.md
+      - Changelog: reference/changelog.md
+
+
+exclude_docs: |
+  PROJECT.md
+  DESIGN_DECISIONS.md
+  RUNBOOK.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - attr_list
+plugins:
+  - search
+  - mermaid2:
+      version: "11"
+  - minify:
+      minify_html: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/cr0hn/festin
+  generator: false

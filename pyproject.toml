@@ -51,6 +51,13 @@ dev = [
     "radon>=6.0.1",
     "pyyaml>=6.0.3",
 ]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-gen-files>=0.6.1",
+    "mkdocs-material>=9.7.7",
+    "mkdocs-mermaid2-plugin>=1.2.3",
+    "mkdocs-minify-plugin>=0.8.0",
+]
 
 [tool.uv]
 package = true

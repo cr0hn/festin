@@ -1,0 +1,38 @@
+# docker-compose for FestIn dashboard
+# usage:  FESTIN_JWT_SECRET=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))") docker compose up -d
+
+services:
+  festin:
+    build: .
+    image: festin:local
+    container_name: festin
+    restart: unless-stopped
+    ports:
+      - "8420:8420"
+    environment:
+      FESTIN_JWT_SECRET: ${FESTIN_JWT_SECRET:?set FESTIN_JWT_SECRET}
+      # optional: route scanner probes through Tor
+      # TOR_SOCKS_URL: socks5://tor:9050
+    volumes:
+      - festin-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8420/api/v1/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # optional: tor sidecar for anonymized scanning
+  tor:
+    image: dperson/torproxy:latest
+    container_name: festin-tor
+    restart: unless-stopped
+    profiles: ["tor"]
+
+volumes:
+  festin-data:

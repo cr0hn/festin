@@ -591,3 +591,4 @@ outdir
 # Test results
 results.festin
 .pytest_cache/
+site/
