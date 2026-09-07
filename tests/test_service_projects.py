@@ -219,7 +219,8 @@ class TestStats:
         assert stats["findings"]["low"] == 0
         assert isinstance(stats["recent_scans"], list)
         for row in stats["recent_scans"]:
-            assert set(row) == {"day", "scans", "buckets", "findings"}
+            assert set(row) == {"day", "scans", "buckets", "findings",
+                                "critical", "high"}
 
     async def test_stats_severity_counts(self, db):
         did = await db.create_domain("sev.example")
