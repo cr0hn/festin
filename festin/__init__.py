@@ -1,4 +1,5 @@
-"""Festin - Credentialless discovery and monitoring of exposed S3-compatible cloud storage from domains, DNS and web crawling."""
+"""Festin - Credentialless discovery and monitoring of exposed
+S3-compatible cloud storage from domains, DNS and web crawling."""
 
 from .black_list import BLACK_LIST_DOMAINS, BLACK_LIST_FLD, BLACK_LIST_PREFIXES
 from .logo import LOGO
