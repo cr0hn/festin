@@ -82,14 +82,30 @@ html {
   color: var(--festin-accent) !important;
 }
 
-/* sidebars stay dark-panel */
-.md-sidebar--primary {
+/* sidebars: full-height dark panels like the dashboard sidebar */
+.md-sidebar--primary,
+.md-sidebar--secondary {
   background: var(--festin-panel);
+  position: sticky;
+  top: 0;
+  bottom: 0;
+  height: 100vh;
+  width: 12.1rem;
+  padding: 0;
+  margin: 0;
+}
+.md-sidebar--primary {
   border-right: 1px solid var(--festin-line);
 }
 .md-sidebar--secondary {
-  background: var(--festin-panel);
   border-left: 1px solid var(--festin-line);
+}
+/* the sticky scrollwrap must also be dark and full height */
+.md-sidebar .md-sidebar__scrollwrap {
+  background: var(--festin-panel);
+  height: 100vh;
+  margin: 0;
+  padding-top: 1.2rem;
 }
 .md-sidebar--primary .md-sidebar__scrollwrap,
 .md-sidebar--secondary .md-sidebar__scrollwrap {
@@ -102,20 +118,29 @@ html {
   letter-spacing: 0.02em;
   margin-top: 0.45em;
   line-height: 1.5;
+  box-shadow: none !important;
 }
 .md-nav__item--active > .md-nav__link,
 .md-nav__link:hover {
   color: var(--festin-accent) !important;
 }
 .md-nav__item--active > .md-nav__link {
-  box-shadow: inset 2px 0 0 var(--festin-accent);
-  background: var(--festin-panel2);
+  background: transparent !important;
+  box-shadow: inset 2px 0 0 var(--festin-accent) !important;
 }
 .md-nav__title {
   color: var(--festin-ink) !important;
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.08em;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* TOC ("Table of contents") title bar in the secondary sidebar */
+.md-sidebar--secondary .md-nav__title {
+  background: transparent !important;
+  color: var(--festin-muted) !important;
+  font-size: 0.7rem;
 }
 .md-nav__icon::after {
   color: var(--festin-muted) !important;
