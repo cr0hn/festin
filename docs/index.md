@@ -1,7 +1,7 @@
 # FestIn
 
 <p align="center">
-  <img src="img/festin-logo-banner.png" alt="FestIn" width="420">
+  <img src="img/festin-logo-banner.png" alt="FestIn" width="140">
 </p>
 
 **FestIn** is a powered **S3 bucket finder** and a **multi-project exposure monitoring dashboard**.
@@ -13,7 +13,25 @@ Two tools in one package:
 | **Scanner CLI** | Crawls domains, permutes bucket names, probes S3-compatible buckets across cloud providers, detects secrets and exposed data. Battle-tested, single binary behavior. | `festin scan <domain>` |
 | **Monitoring dashboard** | Multi-user, multi-project web service that schedules scans, persists results (buckets + findings), and renders an ops-console UI with exposure trends. | `festin serve` → `http://localhost:8420` |
 
+---
+
+## See it in action
+
+**HOME — the exposure radar.** Headline trend, severity split, scan outcomes, rankings.
+
 ![Dashboard — home](img/dashboard-home.png)
+
+**SCANS** — every execution with status tokens and project/status filters:
+
+![Dashboard — scans](img/dashboard-scans.png)
+
+**FINDINGS** — secrets classified by severity, with rule, bucket, object and redacted match:
+
+![Dashboard — findings](img/dashboard-findings.png)
+
+**Scan detail** — buckets with object counts, findings with line and redacted evidence:
+
+![Scan detail](img/dashboard-project.png)
 
 ## Why FestIn
 
@@ -50,8 +68,6 @@ Two tools in one package:
 - **Live results**: scan status ([QUEUED]/[RUNNING]/[DONE]/[FAIL]), findings with severity, buckets with object counts.
 - **Exposure trend**: 14-day headline chart — is your exposure going up or down?
 - **Scheduled scans**: periodic rescans per domain.
-
-![Project detail](img/dashboard-project.png)
 
 ## Repository map
 
