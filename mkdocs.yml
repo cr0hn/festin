@@ -23,7 +23,13 @@ theme:
     - search.suggest
     - search.highlight
   palette:
-    # dark is the default (last, unconditional); light is opt-in via toggle
+    # dark default: unconditional first — Material picks the first matching
+    - scheme: festin-dark
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to light
     - media: "(prefers-color-scheme: light)"
       scheme: festin-light
       primary: custom
@@ -31,12 +37,6 @@ theme:
       toggle:
         icon: material/weather-sunny
         name: Switch to dark
-    - scheme: festin-dark
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/weather-night
-        name: Switch to light
 
   font:
     text: IBM Plex Sans

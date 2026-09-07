@@ -55,7 +55,36 @@ html {
   --paper-muted: #6b6a63;
   --paper-code-bg: #ecebe5;
 }
-
+/* scheme variable sets — apply on html AND body (Material sets the attr
+   on both; the article surface stays paper in every scheme) */
+[data-md-color-scheme="festin-dark"] {
+  --md-default-bg-color: var(--festin-bg);
+  --md-default-fg-color: var(--festin-ink);
+  --md-default-fg-color--light: var(--festin-ink);
+  --md-default-fg-color--lighter: var(--festin-muted);
+  --md-default-fg-color--faint: var(--festin-muted);
+  --md-typeset-color: var(--festin-ink);
+  --md-typeset-a-color: var(--festin-accent);
+  --md-primary-fg-color: var(--festin-panel);
+  --md-primary-bg-color: var(--festin-bg);
+  --md-accent-fg-color: var(--festin-accent);
+  --md-code-bg-color: #111214;
+  --md-code-fg-color: var(--festin-ink);
+  --md-footer-bg-color: var(--festin-panel);
+  --md-footer-fg-color: var(--festin-muted);
+  --md-admonition-bg-color: var(--festin-panel);
+}
+/* scheme variable sets — apply on html AND body (Material sets the attr
+   on both; without the body selector the var loses to Material defaults) */
+body[data-md-color-scheme="festin-dark"] {
+  --md-default-bg-color: var(--festin-bg);
+  --md-typeset-color: var(--festin-ink);
+}
+/* the article surface stays paper in every scheme */
+body .md-main,
+body .md-content {
+  background: var(--paper);
+}
 /* ---------- chrome: dark like the dashboard (both schemes) ---------- */
 
 /* header + tabs stay dark */
