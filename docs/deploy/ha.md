@@ -53,7 +53,7 @@ Auth (JWT) is stateless and handlers are read-mostly:
 
 Caveat: replicas must not run the scheduler or accept mutations → small patch: disable the scheduler + run behind a proxy that routes `POST/DELETE/PATCH` to the active instance. Worth it only if read traffic actually matters.
 
-### Pattern 3 — PostgreSQL backend <span class="chip chip-info">ROADMAP</span>
+### Pattern 3 — PostgreSQL backend <span class="chip chip-ok">IMPLEMENTED 0.4.0</span>
 
 The real unlock for multi-replica:
 
@@ -63,9 +63,9 @@ The real unlock for multi-replica:
            scan workers (Deployment, consumes a real queue)
 ```
 
-- `asyncpg` is already a dependency; the `Database` class isolates the change surface (`connect()`/query layer).
-- Queue in Redis (the `queues.py` Redis path exists but is unwired).
-- Then: HPA on replicas, `RollingUpdate`, per-day findings in a real DB.
+- `FESTIN_DB_DSN=postgres://...` selects the asyncpg backend — done.
+- Queue: `FESTIN_QUEUE=streaq` moves scan execution to Redis Streams consumers — done.
+- Then: HPA on API replicas, `RollingUpdate`, per-day findings in a real DB.
 
 Tracked as a design goal in [ADR #2](../reference/design-decisions.md).
 

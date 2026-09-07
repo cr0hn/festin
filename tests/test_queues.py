@@ -156,9 +156,7 @@ class TestQueueManagerStreaq:
         assert log == [(42, 7, ["a.example.com", "b.example.com"])]
         await qm.stop()
 
-    async def test_streaq_fallback_to_memory_when_redis_unreachable(
-        self, monkeypatch, caplog
-    ):
+    async def test_streaq_fallback_to_memory_when_redis_unreachable(self, monkeypatch, caplog):
         import festin.service.queues as qmod
         from festin.service.queues import QueueManager
 
@@ -249,11 +247,12 @@ class TestRouterDispatch:
         qm.enqueue_scan = fake_enqueue
         qm.start = AsyncMock()
 
-        with sync_patch(
-            "festin.scan_runner.run_scan", new=AsyncMock()
-        ) as mock_run, sync_patch(
-            "festin.service.queues.QueueManager",
-            lambda *a, **kw: qm,
+        with (
+            sync_patch("festin.scan_runner.run_scan", new=AsyncMock()) as mock_run,
+            sync_patch(
+                "festin.service.queues.QueueManager",
+                lambda *a, **kw: qm,
+            ),
         ):
             config = ServiceConfig(db_path=Path(db._db_path))
             app = await create_app(config)

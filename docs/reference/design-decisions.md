@@ -10,13 +10,13 @@ Why things are the way they are — and what was rejected. The short version of 
 
 **Consequence.** `festin/service/api/` contains orphaned FastAPI routers from the first design — legacy, unwired, deletion candidate.
 
-## 2. SQLite by default, asyncpg prepared but not implemented
+## 2. Dual-backend database: SQLite default, PostgreSQL for scale
 
-**Decision.** `Database` uses aiosqlite with a single global connection.
+**Decision.** `Database(dsn)` dispatches on the DSN: SQLite (aiosqlite) by default, PostgreSQL (asyncpg) when the DSN starts with `postgres://`. Both backends expose the identical method set.
 
-**Why.** For watching 1–100 domains on one host, SQLite is zero-config and fast enough. The class encapsulates access so the Postgres migration touches only `connect()` + query layer.
+**Why this shape.** SQLite stays zero-config for single-host monitoring; PostgreSQL unlocks multi-replica HA without touching call sites. The public entrypoint never branches on the engine.
 
-**Debt.** No pooling → no multi-worker. Documented in [HA](../deploy/ha.md).
+**Status.** Implemented in 0.4.0 — 16 integration tests (run against a live PG when `FESTIN_TEST_PG_DSN` is set).
 
 ## 3. JWT HS256 with env secret, no refresh tokens
 

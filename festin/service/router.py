@@ -228,9 +228,7 @@ class FestinRouter:
         self._scan_callback = scan_callback
         self._auth = auth
 
-    async def _dispatch_scan(
-        self, scan_id: int, domain_id: int, domains: list[str]
-    ) -> str | None:
+    async def _dispatch_scan(self, scan_id: int, domain_id: int, domains: list[str]) -> str | None:
         """Send a scan job to the configured backend.
 
         streaq mode: enqueue onto Redis Streams and return the streaq task id.
@@ -558,9 +556,7 @@ class FestinRouter:
             if not isinstance(project_id, int) or project_id < 1:
                 raise web.HTTPBadRequest(reason="'project_id' must be a positive integer")
 
-            async def _persist_scan(
-                domain_name: str, pid: int
-            ) -> tuple[int, int]:
+            async def _persist_scan(domain_name: str, pid: int) -> tuple[int, int]:
                 """Create (or reuse) the domain row and open a scan record."""
                 existing = await self._db.find_domain(domain_name)
                 domain_id = (
@@ -603,9 +599,7 @@ class FestinRouter:
             if self._scan_callback is not None:
                 await self._scan_callback(domains)
                 scan_id, _ = await _persist_scan(domains[0], project_id)
-                return web.json_response(
-                    {"scan_id": scan_id, "status": "accepted"}, status=202
-                )
+                return web.json_response({"scan_id": scan_id, "status": "accepted"}, status=202)
 
             if self._scheduler is None or not hasattr(self._scheduler, "enqueue"):
                 raise web.HTTPServiceUnavailable(reason="No scan backend configured")

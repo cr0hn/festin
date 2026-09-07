@@ -105,9 +105,9 @@ def _client_ip(request: web.Request) -> str:
 
 def _is_exempt_ip(ip: str) -> bool:
     """Local loopback is exempt only when explicitly enabled via env."""
-    return (
-        os.environ.get("FESTIN_RATE_LIMIT_EXEMPT_LOCAL", "").lower() == "true"
-        and ip in ("127.0.0.1", "::1")
+    return os.environ.get("FESTIN_RATE_LIMIT_EXEMPT_LOCAL", "").lower() == "true" and ip in (
+        "127.0.0.1",
+        "::1",
     )
 
 
@@ -133,7 +133,6 @@ def _rate_limit_middleware(limiter: SlidingWindowLimiter) -> Any:
         return await handler(request)
 
     return _rate_limiter
-
 
 
 async def create_app(config: ServiceConfig | None = None) -> web.Application:

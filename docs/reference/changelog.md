@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.0 — Unreleased
+
+### Added
+- **PostgreSQL support**: dual-backend `Database` — SQLite (aiosqlite,
+  default) or PostgreSQL (asyncpg) selected by DSN (`FESTIN_DB_DSN` /
+  `--db-dsn`). 16 integration tests (skipped unless `FESTIN_TEST_PG_DSN`).
+- **streaQ scan queue** (`FESTIN_QUEUE=streaq`): scans enqueue onto Redis
+  Streams; a separate `festin-worker` process consumes them. In-flight
+  scans survive API restarts; Redis unreachable → automatic fallback to
+  memory mode.
+- **Rate limiting**: login + register limited per IP (5 attempts / 60 s
+  default, env-tunable), 429 + `Retry-After` on excess.
+- **Scan watchdog**: scans stuck in `running` beyond `scan_timeout` are
+  marked `failed` by the scheduler loop.
+- **Docker workflow**: multi-arch image built and pushed to Docker Hub on
+  every master push / `v*` tag (cr0hn/festin).
+- **Auth matrix tests**: full register/login/role matrix automated
+  (bootstrap admin → anon 401 → admin creates viewer → viewer 403).
+
+### Changed
+- `festin-worker` console entry point added (`pip install 'festin[queue]'`).
+- Author metadata: Daniel Alfocea <daniel@danielalfocea.com>.
+
+### Removed
+- Demo database with known credentials removed from the repository.
+- Legacy unwired FastAPI routers (`festin/service/api/`) deleted.
+
+## 0.3.1 — 2026-09-08
+
+- PyPI metadata: new tagline + author (Daniel Alfocea).
+
 ## Unreleased
 
 ### Added

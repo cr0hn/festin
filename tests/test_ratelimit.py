@@ -176,8 +176,6 @@ class TestProfiles:
 # ===== Service-level auth rate limiting (festin.service.serve) =====
 
 
-
-
 class _FakeRequest:
     """Minimal request stub for direct middleware unit tests."""
 
@@ -232,10 +230,8 @@ class TestRateLimitMiddleware:
             called.append(req)
             return web.json_response({"ok": True})
 
-
         async def run():
             return await _rate_limit_middleware(limiter)(request, handler)
-
 
         return asyncio.run(run()), called
 
@@ -326,11 +322,8 @@ class TestRateLimitEndToEnd:
         data = await resp.json()
         assert data["error"] == "too many attempts, retry later"
 
-
     async def _login(self, client):
-        return await client.post(
-            "/api/v1/auth/login", json={"username": "u", "password": "p"}
-        )
+        return await client.post("/api/v1/auth/login", json={"username": "u", "password": "p"})
 
     async def test_sixth_login_attempt_gets_429(self, client):
         for _ in range(5):
@@ -373,13 +366,9 @@ class TestRateLimitEndToEnd:
         await tc.start_server()
         try:
             for _ in range(2):
-                resp = await tc.post(
-                    "/api/v1/auth/login", json={"username": "u", "password": "p"}
-                )
+                resp = await tc.post("/api/v1/auth/login", json={"username": "u", "password": "p"})
                 assert resp.status in (401, 200)
-            resp = await tc.post(
-                "/api/v1/auth/login", json={"username": "u", "password": "p"}
-            )
+            resp = await tc.post("/api/v1/auth/login", json={"username": "u", "password": "p"})
             assert resp.status == 429
         finally:
             await tc.close()
@@ -390,4 +379,3 @@ class TestRateLimitEndToEnd:
         cfg = ServiceConfig()
         assert cfg.rate_limit_attempts == 5
         assert cfg.rate_limit_window == 60
-

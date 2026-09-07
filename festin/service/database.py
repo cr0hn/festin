@@ -1035,8 +1035,7 @@ class _PostgresBackend:
     async def _try_alter(self, table: str, column: str, decl: str) -> None:
         """Add a column, tolerating databases that already have it."""
         exists = await self._conn.fetchval(
-            "SELECT 1 FROM information_schema.columns "
-            "WHERE table_name = $1 AND column_name = $2",
+            "SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2",
             table,
             column,
         )
@@ -1105,8 +1104,7 @@ class _PostgresBackend:
     async def create_user(self, username: str, password_hash: str, role: str = "viewer") -> int:
         """Create a user. Returns its id."""
         return await self._conn.fetchval(
-            "INSERT INTO users (username, password_hash, role) "
-            "VALUES ($1, $2, $3) RETURNING id",
+            "INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id",
             username,
             password_hash,
             role,
@@ -1236,8 +1234,7 @@ class _PostgresBackend:
         """Return buckets list with total count."""
         total = await self._conn.fetchval("SELECT COUNT(*) FROM buckets")
         rows = await self._conn.fetch(
-            "SELECT id, scan_id, name, objects_count FROM buckets "
-            "ORDER BY id DESC LIMIT $1",
+            "SELECT id, scan_id, name, objects_count FROM buckets ORDER BY id DESC LIMIT $1",
             limit,
         )
         buckets = [
@@ -1578,9 +1575,7 @@ class _PostgresBackend:
 
     async def delete_user(self, user_id: int) -> bool:
         """Delete a user. True if deleted."""
-        deleted = await self._conn.fetchval(
-            "DELETE FROM users WHERE id = $1 RETURNING 1", user_id
-        )
+        deleted = await self._conn.fetchval("DELETE FROM users WHERE id = $1 RETURNING 1", user_id)
         return deleted is not None
 
     async def count_admins(self) -> int:
@@ -1601,8 +1596,11 @@ class _PostgresBackend:
         clauses = []
         params: list[Any] = []
         if project_id is not None:
-            clauses.append("s.domain_id IN (SELECT id FROM domains WHERE project_id = $" +
-                           str(len(params) + 1) + ")")
+            clauses.append(
+                "s.domain_id IN (SELECT id FROM domains WHERE project_id = $"
+                + str(len(params) + 1)
+                + ")"
+            )
             params.append(project_id)
         if status is not None:
             clauses.append("s.status = $" + str(len(params) + 1))
@@ -1761,9 +1759,7 @@ class _PostgresBackend:
     async def get_dashboard_overview(self) -> dict[str, Any]:
         """Build a dashboard overview with domain and scan statistics."""
         total_domains = await self._conn.fetchval("SELECT COUNT(*) FROM domains")
-        active_domains = await self._conn.fetchval(
-            "SELECT COUNT(*) FROM domains WHERE enabled=1"
-        )
+        active_domains = await self._conn.fetchval("SELECT COUNT(*) FROM domains WHERE enabled=1")
         total_scans = await self._conn.fetchval("SELECT COUNT(*) FROM scans")
         total_buckets = await self._conn.fetchval(
             "SELECT COALESCE(SUM(buckets_found), 0) FROM scans"
