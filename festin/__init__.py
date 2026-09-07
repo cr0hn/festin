@@ -6,7 +6,7 @@ from .logo import LOGO
 from .s3 import get_redirection, parse_result
 from .utils import valid_domain_or_link
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = (
     "LOGO",
