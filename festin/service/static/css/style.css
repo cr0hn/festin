@@ -25,8 +25,8 @@ html, body {
     background: var(--bg);
     color: var(--ink);
     font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 15px;
+    line-height: 1.55;
 }
 
 a { color: var(--accent); text-decoration: none; }
@@ -37,14 +37,14 @@ a:hover { text-decoration: underline; }
 /* ---- type primitives ---- */
 
 .micro {
-    font-size: 12px;
+    font-size: 13px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--muted);
 }
 
 .view-title {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 600;
     margin: 0;
     letter-spacing: 0.02em;
@@ -57,7 +57,7 @@ a:hover { text-decoration: underline; }
     color: var(--ink);
 }
 
-.wordmark-sm { font-size: 16px; }
+.wordmark-sm { font-size: 17px; }
 
 .num { font-variant-numeric: tabular-nums; text-align: right; }
 
@@ -72,7 +72,7 @@ a:hover { text-decoration: underline; }
     border: 1px solid var(--accent);
     border-left: 3px solid var(--accent);
     padding: 8px 12px;
-    font-size: 12px;
+    font-size: 13px;
     max-width: 420px;
 }
 
@@ -84,8 +84,8 @@ a:hover { text-decoration: underline; }
 .shell { display: flex; min-height: 100vh; }
 
 .sidebar {
-    width: 200px;
-    flex: 0 0 200px;
+    width: 230px;
+    flex: 0 0 230px;
     border-right: 1px solid var(--line);
     background: var(--panel);
     display: flex;
@@ -97,23 +97,30 @@ a:hover { text-decoration: underline; }
 }
 
 .main {
-    margin-left: 200px;
+    margin-left: 230px;
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
 }
 
-.brand { padding: 16px; }
-.brand-sep { border-top: 1px solid var(--line); margin: 8px 0; }
+.brand {
+    padding: 18px 16px 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.brand-mark { display: block; image-rendering: auto; }
+.brand-sub { padding: 0 16px 4px 16px; }
+.brand-sep { border-top: 1px solid var(--line); margin: 10px 0; }
 
-.nav { display: flex; flex-direction: column; padding: 8px 0; }
+.nav { display: flex; flex-direction: column; padding: 10px 0; gap: 2px; }
 
 .nav-link {
     display: block;
-    padding: 6px 16px;
-    font-size: 12px;
-    letter-spacing: 0.08em;
+    padding: 10px 16px;
+    font-size: 14px;
+    letter-spacing: 0.06em;
     color: var(--muted);
     border-left: 2px solid transparent;
 }
@@ -129,7 +136,7 @@ a:hover { text-decoration: underline; }
 .sidebar-foot { margin-top: auto; padding: 16px; }
 
 .health-strip {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--muted);
     letter-spacing: 0.04em;
 }
@@ -155,15 +162,15 @@ a:hover { text-decoration: underline; }
 
 .user-chip {
     border: 1px solid var(--line);
-    padding: 3px 10px;
-    font-size: 12px;
+    padding: 4px 12px;
+    font-size: 13px;
     display: inline-flex;
     gap: 8px;
     align-items: baseline;
 }
 
 .chip-role {
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--accent);
@@ -181,7 +188,7 @@ a:hover { text-decoration: underline; }
 }
 
 .panel-label {
-    font-size: 11px;
+    font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--muted);
@@ -209,7 +216,7 @@ a:hover { text-decoration: underline; }
 }
 
 .count-item { display: flex; flex-direction: column; gap: 2px; }
-.count-item .count-value { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.count-item .count-value { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* ---- tables ---- */
 
@@ -227,12 +234,12 @@ a:hover { text-decoration: underline; }
 table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: 15px;
 }
 
 th {
     text-align: left;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     text-transform: uppercase;
     padding: 10px 10px;
@@ -263,7 +270,7 @@ td.snippet, .snippet {
 /* ---- status + severity tokens ---- */
 
 .token {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.06em;
     white-space: nowrap;
@@ -281,7 +288,7 @@ td.snippet, .snippet {
 
 .sev {
     display: inline-block;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.08em;
     padding: 1px 6px;
@@ -301,7 +308,7 @@ input, select {
     border: 1px solid var(--line);
     color: var(--ink);
     font-family: inherit;
-    font-size: 14px;
+    font-size: 15px;
     padding: 8px 10px;
     min-width: 0;
 }
@@ -316,13 +323,15 @@ button:focus-visible, a:focus-visible {
     outline-offset: 1px;
 }
 
-.form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
-.form-row input, .form-row select { flex: 0 1 auto; }
+.form-row { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; margin-bottom: 14px; }
+.form-row input, .form-row select { flex: 0 1 auto; min-width: 160px; }
+.form-row .btn { flex: 0 0 auto; }
+.form-row input[placeholder*="description"] { flex: 1 1 260px; }
 .field-label { display: block; margin: 10px 0 4px 0; }
 
 .btn {
     font-family: inherit;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -348,9 +357,9 @@ button:focus-visible, a:focus-visible {
 
 .btn-block { display: block; width: 100%; margin-top: 10px; }
 
-.btn-sm { padding: 4px 10px; font-size: 11px; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
 
-.form-error { color: var(--critical); font-size: 12px; margin-top: 8px; }
+.form-error { color: var(--critical); font-size: 13px; margin-top: 8px; }
 
 /* ---- login ---- */
 
@@ -380,20 +389,21 @@ button:focus-visible, a:focus-visible {
 .empty { color: var(--muted); padding: 10px 2px; }
 .empty-err { color: var(--critical); padding: 10px 2px; }
 
-.mono-note { color: var(--muted); font-size: 13px; }
+.mono-note { color: var(--muted); font-size: 14px; }
 
 /* ---- responsive ---- */
 
 /* Tablet: sidebar narrows */
 @media (max-width: 1000px) {
-    .sidebar { width: 170px; flex-basis: 170px; }
-    .main { margin-left: 170px; }
+    .sidebar { width: 190px; flex-basis: 190px; }
+    .main { margin-left: 190px; }
+    .brand-sub { display: none; }
     td.snippet, .snippet { max-width: 240px; }
 }
 
 /* Mobile: top bar nav, full-width controls, touch targets */
 @media (max-width: 700px) {
-    html, body { font-size: 14px; }
+    html, body { font-size: 15px; }
 
     .shell { display: block; }
     .sidebar {
@@ -412,7 +422,7 @@ button:focus-visible, a:focus-visible {
         gap: 10px;
         padding: 12px 14px 8px 14px;
     }
-    .wordmark { font-size: 18px; letter-spacing: 0.22em; }
+    .wordmark { font-size: 19px; letter-spacing: 0.22em; }
     .wordmark-sm, .brand .micro { display: none; }
     .brand-sep { margin: 0; }
 
@@ -426,7 +436,7 @@ button:focus-visible, a:focus-visible {
     }
     .nav-link {
         padding: 10px 12px;
-        font-size: 13px;
+        font-size: 14px;
         white-space: nowrap;
         border-left: none;
         border-bottom: 2px solid transparent;
@@ -438,14 +448,14 @@ button:focus-visible, a:focus-visible {
     .content { padding: 12px 14px 24px 14px; }
 
     /* tables: wider cells, comfortable touch rows */
-    table { font-size: 14px; }
-    th { font-size: 11px; padding: 8px 10px; }
+    table { font-size: 15px; }
+    th { font-size: 12px; padding: 8px 10px; }
     td { padding: 12px 10px; }
     tr.clickable:hover td:first-child { border-left-width: 0; padding-left: 10px; }
     td.snippet, .snippet { max-width: 160px; }
 
     .count-strip { gap: 18px; padding: 10px 12px; }
-    .count-item .count-value { font-size: 18px; }
+    .count-item .count-value { font-size: 19px; }
     .panel { padding: 12px; }
 
     /* forms: full-width stacked, 44px touch targets, no iOS zoom */
@@ -454,7 +464,7 @@ button:focus-visible, a:focus-visible {
     .form-row { flex-direction: column; align-items: stretch; gap: 10px; }
     .form-row input, .form-row select, .form-row .btn { flex: 1 1 auto; width: 100%; }
     .btn { padding: 11px 16px; }
-    .btn-sm { min-height: 36px; padding: 8px 12px; font-size: 12px; }
+    .btn-sm { min-height: 38px; padding: 8px 12px; font-size: 13px; }
 
     .section-head { flex-wrap: wrap; }
     .login-wrap { padding: 20px; }
