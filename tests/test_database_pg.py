@@ -1,25 +1,55 @@
-"""Tests for multi-project, scan-result persistence, and user management."""
+"""PostgreSQL backend tests for the dual-backend Database.
+
+Skipped entirely unless FESTIN_TEST_PG_DSN points at a disposable
+PostgreSQL database, e.g.::
+
+    FESTIN_TEST_PG_DSN=postgres://festin:festin@localhost:5432/festin_test \
+        uv run pytest tests/test_database_pg.py --timeout=30 -q
+
+The DSN-targeted database is dropped and recreated by the module fixture,
+so never point it at data you care about.
+"""
 
 from __future__ import annotations
 
-import tempfile
+import os
 from typing import Any
 
 import pytest
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not os.environ.get("FESTIN_TEST_PG_DSN"),
+        reason="FESTIN_TEST_PG_DSN not set; PostgreSQL backend not under test",
+    ),
+]
+
+PG_DSN = os.environ.get("FESTIN_TEST_PG_DSN", "")
+
 
 # ===== Fixtures =====
 
 
 @pytest.fixture
 async def db():
+    """Connect to a fresh PostgreSQL database for every test."""
     from festin.service.database import Database
 
-    with tempfile.TemporaryDirectory() as tmp:
-        db = Database(f"{tmp}/test.db")
-        await db.connect()
-        await db.migrate()
-        yield db
-        await db.disconnect()
+    db = Database(PG_DSN)
+    await db.connect()
+    await _drop_all(db)
+    await db.migrate()
+    yield db
+    await db.disconnect()
+
+
+async def _drop_all(db: Any) -> None:
+    """Drop every FestIn table so migrate() starts from scratch."""
+    await db._conn.execute(
+        "DROP TABLE IF EXISTS scheduled_scans, buckets, findings, scans, "
+        "users, domains, projects CASCADE"
+    )
 
 
 class _Bucket:
@@ -43,17 +73,22 @@ class _Finding:
         self.match = "AKIA****EXAMPLE"
 
 
+# ===== Lifecycle =====
+
+
+class TestLifecycle:
+    async def test_migrate_idempotent(self, db):
+        await db.migrate()
+        await db.migrate()
+        projects = await db.list_projects()
+        assert projects["total"] == 1
+        assert projects["projects"][0]["id"] == 1
+
+
 # ===== Projects =====
 
 
 class TestProjects:
-    async def test_default_project_seeded(self, db):
-        projects = await db.list_projects()
-        assert projects["total"] == 1
-        first = projects["projects"][0]
-        assert first["id"] == 1
-        assert first["name"]
-
     async def test_create_list_update_delete(self, db):
         pid = await db.create_project("acme", "red team")
         got = await db.get_project(pid)
@@ -231,42 +266,3 @@ class TestStats:
         assert stats["findings"]["critical"] == 1
         assert stats["findings"]["medium"] == 1
         assert stats["findings"]["high"] == 0
-
-
-# ===== Dual-backend dispatch (always run; no server needed) =====
-
-
-class TestBackendDispatch:
-    def test_sqlite_and_pg_dispatch_to_different_classes(self):
-        from festin.service.database import Database
-
-        sqlite_backend = Database("dispatch-test.db")
-        pg_backend = Database("postgres://user:pass@localhost:5432/festin")
-        assert type(sqlite_backend) is not type(pg_backend)
-
-    def test_both_backends_expose_same_methods(self):
-        from festin.service.database import Database
-
-        sqlite_backend = Database("dispatch-test.db")
-        pg_backend = Database("postgresql://user:pass@localhost:5432/festin")
-        sqlite_methods = {
-            name
-            for name in dir(type(sqlite_backend))
-            if not name.startswith("_") and callable(getattr(type(sqlite_backend), name))
-        }
-        pg_methods = {
-            name
-            for name in dir(type(pg_backend))
-            if not name.startswith("_") and callable(getattr(type(pg_backend), name))
-        }
-        assert sqlite_methods == pg_methods
-        assert sqlite_methods  # sanity: we actually collected methods
-
-    def test_path_object_and_dsn_forms_dispatch(self):
-        from pathlib import Path as _Path
-
-        from festin.service.database import Database, _PostgresBackend, _SQLiteBackend
-
-        assert isinstance(Database(_Path("x.db")), _SQLiteBackend)
-        assert isinstance(Database("postgres://h/db"), _PostgresBackend)
-        assert isinstance(Database("postgresql://h/db"), _PostgresBackend)

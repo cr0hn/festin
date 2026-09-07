@@ -74,6 +74,7 @@ build-backend = "hatchling.build"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 timeout = 60
+markers = ["integration: tests requiring external services (PostgreSQL, Redis)"]
 
 [tool.ruff]
 line-length = 100
