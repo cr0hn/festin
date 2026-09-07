@@ -38,6 +38,10 @@ theme:
         icon: material/weather-night
         name: Switch to light
 
+  font:
+    text: IBM Plex Sans
+    code: IBM Plex Mono
+
 extra_css:
   - css/festin.css
 

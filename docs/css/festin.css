@@ -1,5 +1,26 @@
 /* FestIn docs theme — mirrors the dashboard ops console (warm dark + amber) */
 
+/* readability: bigger base, heavier weights than Material's thin defaults */
+html {
+  --md-text-font-size: 16px;
+}
+.md-typeset {
+  font-size: 0.86rem;
+  line-height: 1.7;
+}
+.md-typeset p,
+.md-typeset li {
+  font-weight: 400;
+}
+/* headings and links read solid, not thin */
+.md-typeset a {
+  font-weight: 500;
+}
+.md-nav__link,
+.md-tabs__link {
+  font-weight: 500;
+}
+
 :root {
   --festin-bg: #141518;
   --festin-panel: #1a1c20;
@@ -49,8 +70,9 @@
 }
 [data-md-color-scheme="festin-dark"] .md-tabs__link {
   color: var(--festin-muted);
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-top: 0;
 }
@@ -72,14 +94,11 @@
 /* nav links: muted grey uppercase-ish like dashboard nav */
 [data-md-color-scheme="festin-dark"] .md-nav__link {
   color: var(--festin-muted);
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-  margin-top: 0.35em;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  margin-top: 0.45em;
+  line-height: 1.5;
 }
-[data-md-color-scheme="festin-dark"] .md-nav__link:hover {
-  color: var(--festin-ink);
-}
-/* active item: amber text + amber left bar, panel2 bg — dashboard nav-link.active */
 [data-md-color-scheme="festin-dark"] .md-nav__item--active > .md-nav__link {
   color: var(--festin-accent);
   box-shadow: inset 2px 0 0 var(--festin-accent);
@@ -87,7 +106,8 @@
 }
 [data-md-color-scheme="festin-dark"] .md-nav__title {
   color: var(--festin-ink);
-  font-size: 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
   letter-spacing: 0.08em;
 }
 
@@ -118,8 +138,11 @@
 /* header logo sizing (hex mark) */
 .md-header__button.md-logo img,
 .md-header__button.md-logo svg {
-  height: 26px;
+  height: 34px;
   width: auto;
+}
+.md-header__button.md-logo {
+  padding: 0.3rem;
 }
 
 /* ---------- light scheme: same mono identity, paper tone ---------- */
