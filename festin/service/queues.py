@@ -62,6 +62,48 @@ def get_db_dsn(env: dict[str, str] | None = None) -> str:
     source = os.environ if env is None else env
     return source.get(DB_DSN_ENV, DEFAULT_DB_DSN)
 
+logger = logging.getLogger("festin.service.queues")
+
+QUEUE_MODE_ENV = "FESTIN_QUEUE"
+REDIS_URL_ENV = "FESTIN_REDIS_URL"
+DB_DSN_ENV = "FESTIN_DB_DSN"
+DEFAULT_REDIS_URL = "redis://localhost:6379/0"
+DEFAULT_DB_DSN = "data/festin.db"
+VALID_MODES = ("memory", "streaq")
+
+
+def get_queue_mode(env: dict[str, str] | None = None) -> str:
+    """Resolve the queue mode from the environment (default: memory)."""
+    source = os.environ if env is None else env
+    mode = source.get(QUEUE_MODE_ENV, "memory").strip().lower()
+    if mode not in VALID_MODES:
+        logger.warning(
+            "Invalid %s=%r — falling back to 'memory' (valid: %s)",
+            QUEUE_MODE_ENV,
+            mode,
+            ", ".join(VALID_MODES),
+        )
+        return "memory"
+    return mode
+
+
+def get_redis_url(env: dict[str, str] | None = None) -> str:
+    """Resolve the Redis URL from the environment."""
+    source = os.environ if env is None else env
+    return source.get(REDIS_URL_ENV, DEFAULT_REDIS_URL)
+
+
+def get_db_dsn(env: dict[str, str] | None = None) -> str:
+    """Resolve the database DSN for worker processes.
+
+    Workers run in a separate process and cannot share the web service's
+    Database connection, so they rebuild one from the same DSN the
+    service was configured with (FESTIN_DB_DSN or the default SQLite
+    path used by the service).
+    """
+    source = os.environ if env is None else env
+    return source.get(DB_DSN_ENV, DEFAULT_DB_DSN)
+
 
 class FestinQueue:
     """Scan job queue backed by Redis Streams (with local fallback)."""
@@ -331,28 +373,15 @@ class StatusTracker:
 SCAN_TASK_NAME = "run_scan_task"
 
 
-class StreaqBundle(NamedTuple):
-    """Worker plus its registered scan task.
-
-    ``task`` is the AsyncRegisteredTask returned by the ``@worker.task``
-    decorator — the only object with a working ``.enqueue()``.
-    """
-
-    worker: Any
-    task: Any
-
-
-async def build_streaq_worker(redis_url: str) -> StreaqBundle:
+async def build_streaq_worker(redis_url: str) -> Any:
     """Build a streaQ Worker with the scan task registered.
 
     Probes the Redis connection before returning so callers can fall back
     to memory mode when Redis is unreachable. Raises on any failure.
 
-    Returns the worker (for the consumer process to run) and the
-    registered task (for the API process to enqueue with). The worker
-    object itself is NOT running its loop here — enqueueing only needs
-    the task; consumption happens in the separate ``festin-worker``
-    process.
+    The worker object is returned without running its loop — enqueueing
+    only needs the registered task; consumption happens in the separate
+    ``festin-worker`` process.
     """
     from streaq import Worker  # optional dependency (lazy import)
 
@@ -367,7 +396,7 @@ async def build_streaq_worker(redis_url: str) -> StreaqBundle:
     # connection; any failure (refused, timeout) surfaces here.
     async with worker:
         await worker.redis.ping()
-    return StreaqBundle(worker=worker, task=worker.registry[SCAN_TASK_NAME])
+    return worker
 
 
 async def execute_scan_task(
