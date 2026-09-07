@@ -89,7 +89,7 @@ class AuthService:
             return False
         pw = password or secrets.token_urlsafe(12)
         pw_hash = self._hasher.hash_password(pw)
-        await self._db.create_user(username, pw_hash)
+        await self._db.create_user(username, pw_hash, "admin")
         print(f"[auth] Admin: {username} (password: {pw})")
         return True
 
@@ -100,7 +100,12 @@ class AuthService:
         if not self._hasher.verify_password(password, user["password_hash"]):
             raise ValueError("Invalid credentials")
         token = self._token_service.create_token(username)
-        return {"access_token": token, "token_type": "bearer"}
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "username": username,
+            "role": user.get("role", "viewer"),
+        }
 
     async def register(
         self, username: str, password: str, role: str = "viewer"

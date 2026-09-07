@@ -162,21 +162,35 @@ Todos los endpoints bajo `/api/v1` (salvo los marcados públicos):
 | Método | Ruta | Función | Notas |
 |---|---|---|---|
 | GET | `/health` | público | `{"status":"ok","pending":N}` |
-| POST | `/auth/login` | público | `{username,password}` → `{access_token}` JWT HS256 60min |
+| POST | `/auth/login` | público | `{username,password}` → `{access_token,username,role}` JWT HS256 60min |
 | POST | `/auth/register` | semi-público | bootstrap/admin según tabla |
 | GET | `/stats` | auth | `{"scan_count","findings":{"total","critical","high"}}` |
-| GET | `/scans?limit=` | auth | lista paginada |
+| GET | `/scans?limit=&project_id=&status=` | auth | lista paginada, JOIN proyecto/dominio |
 | DELETE | `/scans/{id}` | auth | cascade findings/buckets |
 | GET | `/findings?severity=&limit=` | auth | filtrable |
 | GET | `/buckets?limit=` | auth | |
 | GET/POST | `/queues/schedule` | auth | clave de respuesta: `scheduled` |
 | DELETE | `/queues/schedule/{id}` | auth | |
-| POST | `/scans/run-scan` | auth | 202, ejecuta scan real en background |
+| POST | `/scans/run-scan` | auth | 202, body `{domains, project_id?}` (default 1); persiste buckets/findings |
+| GET | `/projects` | auth | proyectos con counts (domains/scans/findings/last_scan_at) |
+| POST | `/projects` | admin | 409 nombre duplicado |
+| GET | `/projects/{id}` | auth | `{"project":{...},"domains":[...]}` |
+| PATCH | `/projects/{id}` | admin | |
+| DELETE | `/projects/{id}` | admin | cascade; id 1 (default) → 400 |
+| POST | `/projects/{id}/domains` | admin | 409 si el dominio ya existe globalmente |
+| GET | `/domains?project_id=` | auth | |
+| DELETE | `/domains/{id}` | admin | cascade scans/findings/buckets |
+| GET | `/scans/{id}` | auth | detalle: `{"scan","findings","buckets"}`; 404 si no existe |
+| GET | `/users` | admin | |
+| POST | `/users` | admin | `{username,password,role}` |
+| PATCH | `/users/{id}` | admin | `{role}` |
+| DELETE | `/users/{id}` | admin | 400 auto-borrado o último admin |
 
-**Database (23 métodos):** ver `festin/service/database.py` — CRUD de
-domains, scans, users, findings, buckets, scheduled_scans + `get_stats()` y
-`get_dashboard_overview()` (este último legado del diseño FastAPI, no
-wireado).
+**Database (+25 métodos):** ver `festin/service/database.py` — CRUD de
+projects, domains (con project_id), scans (con filtros y JOIN), users
+(roles), findings/buckets (persist_scan_results inserta filas reales),
+scheduled_scans + `get_stats()`, `get_dashboard_overview()` y
+`get_scan_detail()` (bundle scan+findings+buckets).
 
 **Scheduler facade** (`Scheduler` en scheduler.py): `enqueue(domains)` →
 `{"job_id","status":"pending"}`, `stats()` → `{"pending","running","completed"}`,

@@ -1,9 +1,0 @@
-/* FestIn Monitor - Dark Security Theme */
-:root { --bg-primary:#1f2937; --bg-secondary:#111827; --border-color:#374151; }
-body { background: var(--bg-secondary); }
-::-webkit-scrollbar { width:6px; }
-::-webkit-scrollbar-track { background:var(--bg-primary); }
-::-webkit-scrollbar-thumb { background:var(--border-color); border-radius:3px; }
-[x-cloak] { display:none!important; }
-.badge-running { animation:pulse-green 2s infinite; }
-@keyframes pulse-green { 0%,100%{opacity:1;} 50%{opacity:0.6;} }

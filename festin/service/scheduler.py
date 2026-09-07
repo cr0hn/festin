@@ -88,6 +88,10 @@ class FestInScheduler:
                 scan_id=f"svc-{domain_id}-{int(time.time())}",
             )
             result_obj = await run_scan(cli_args, [domain_name])
+            if result_obj is not None:
+                await self.database.persist_scan_results(
+                    scan_record_id, result_obj.buckets, result_obj.findings
+                )
             result["buckets_found"] = len(getattr(result_obj, "buckets", []) or [])
             result["findings_count"] = len(getattr(result_obj, "findings", []) or [])
         except Exception as exc:

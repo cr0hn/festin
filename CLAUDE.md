@@ -12,7 +12,7 @@ monitoreo multi-usuario (servicio). Python 3.13+, uv, pytest.
 
 - Escáner CLI: `festin/` — estable, maduro, no tocar sin necesidad.
 - Dashboard: `festin/service/` — nuevo (sept 2026), aiohttp + SQLite + JWT.
-- **289 tests en verde. 9 commits locales SIN push (bloqueado por el usuario — nunca push sin orden explícita).**
+- **303 tests en verde. 10 commits locales SIN push (bloqueado por el usuario — nunca push sin orden explícita).**
 
 ```bash
 uv run pytest --timeout=30 -q     # suite completa (~67s). timeout SIEMPRE
@@ -26,9 +26,10 @@ uv run python -m festin.service.serve   # dashboard en :8420 (admin/admin123 dem
 ```
 festin/                → escáner CLI (cli.py = typer; scan_runner.py = pipeline)
 festin/service/        → dashboard: serve.py (factory), router.py (API),
-                         auth.py (JWT/bcrypt), database.py (23 métodos),
-                         scheduler.py, queues.py, static/ (SPA vanilla JS)
-tests/                 → 21 archivos; test_service.py = dashboard
+                         auth.py (JWT/bcrypt), database.py (+25 métodos),
+                         scheduler.py, queues.py, static/ (SPA vanilla JS,
+                         consola industrial mono — ver avoid-ai-design)
+tests/                 → 22 archivos; test_service.py + test_service_projects.py = dashboard
 docs/                  → PROJECT.md (guía profunda), DESIGN_DECISIONS.md, RUNBOOK.md
 ```
 
@@ -55,6 +56,13 @@ docs/                  → PROJECT.md (guía profunda), DESIGN_DECISIONS.md, RUN
 5. **Verificación de UI**: siempre headless browser contra el servidor real
    (`localhost:8420`). `localStorage.clear()` antes de testear login — el
    estado residual engaña.
+6. **Multi-proyecto**: `projects` tabla; todo dominio/scan pertenece a un
+   proyecto (default id=1). `run-scan` acepta `project_id`. Los resultados
+   reales (buckets/findings) se insertan como filas via
+   `persist_scan_results` — nunca solo contar.
+7. **Roles**: admin gestiona usuarios/proyectos (mutations); viewer solo
+   lectura. El select de rol de TU PROPIO usuario va disabled en la UI
+   (self-demotion = lockout). Borrar último admin → 400.
 
 ---
 

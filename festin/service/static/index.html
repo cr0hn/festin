@@ -3,115 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Festin — S3 Bucket Monitor</title>
+    <title>FestIn — S3 Exposure Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <header class="app-header">
-        <div class="container app-header-inner">
-            <div>
-                <h1>Festin</h1>
-                <p class="subtitle">S3 Bucket Monitoring Dashboard</p>
-            </div>
-            <div id="user-area" class="user-area" hidden>
-                <span id="user-name" class="user-name"></span>
-                <button id="logout-btn" class="btn btn-sm btn-secondary">Logout</button>
-            </div>
-        </div>
-    </header>
+    <div id="flash-toast" class="flash flash-hidden" hidden></div>
 
-    <!-- Login View -->
-    <section id="login-section" class="login-section" hidden>
-        <div class="login-card">
-            <h2 id="login-title">Sign in to Festin</h2>
-            <form id="login-form" class="login-form">
-                <input type="text" id="login-username" placeholder="Username" autocomplete="username" required>
-                <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" required>
-                <button type="submit" id="login-submit" class="btn btn-primary">Sign in</button>
+    <!-- Auth -->
+    <section id="view-login" class="login-wrap" hidden>
+        <div class="login-panel">
+            <div class="wordmark">FESTIN</div>
+            <div class="micro login-sub">S3 EXPOSURE MONITOR</div>
+            <form id="login-form" data-form="login" novalidate>
+                <label class="micro field-label" for="login-username">USERNAME</label>
+                <input id="login-username" name="username" autocomplete="username" spellcheck="false">
+                <label class="micro field-label" for="login-password">PASSWORD</label>
+                <input id="login-password" type="password" autocomplete="current-password">
+                <div id="login-mode" class="micro login-mode">// first account becomes ADMIN</div>
+                <div id="login-error" class="form-error" hidden></div>
+                <button type="submit" id="login-submit" class="btn btn-primary btn-block">SIGN IN</button>
+                <button type="button" id="register-toggle" class="btn btn-ghost btn-block" data-action="toggle-register">CREATE ADMIN ACCOUNT</button>
             </form>
-            <p id="login-error" class="login-error" hidden></p>
-            <a href="#" id="register-toggle" class="register-link">Create admin account</a>
         </div>
     </section>
 
-    <div id="dashboard" class="container">
-        <!-- Stats Bar -->
-        <section id="stats-bar" class="stats-bar">
-            <div class="stat-card">
-                <span class="stat-value" id="stat-scans">0</span>
-                <span class="stat-label">Scans</span>
+    <!-- Shell -->
+    <div id="shell" class="shell" hidden>
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="wordmark wordmark-sm">FESTIN</div>
+                <div class="brand-sep"></div>
+                <div class="micro">S3 EXPOSURE MONITOR</div>
             </div>
-            <div class="stat-card">
-                <span class="stat-value" id="stat-findings">0</span>
-                <span class="stat-label">Findings</span>
+            <nav class="nav" aria-label="primary">
+                <a href="#/projects" class="nav-link" data-nav="projects">PROJECTS</a>
+                <a href="#/scans" class="nav-link" data-nav="scans">SCANS</a>
+                <a href="#/findings" class="nav-link" data-nav="findings">FINDINGS</a>
+                <a href="#/users" class="nav-link" data-nav="users" data-admin-only hidden>USERS</a>
+            </nav>
+            <div class="sidebar-foot">
+                <div class="brand-sep"></div>
+                <div id="health-strip" class="health-strip">&bull; SCHED &mdash; &middot; PENDING &mdash;</div>
             </div>
-            <div class="stat-card stat-card-critical">
-                <span class="stat-value" id="stat-critical">0</span>
-                <span class="stat-label">Critical</span>
-            </div>
-            <div class="stat-card stat-card-high">
-                <span class="stat-value" id="stat-high">0</span>
-                <span class="stat-label">High</span>
-            </div>
-        </section>
+        </aside>
 
-        <!-- Scan Queue -->
-        <section class="panel">
-            <h2>New Scan</h2>
-            <form id="scan-form" class="scan-form">
-                <input type="text" id="domains-input" placeholder="Enter domains (comma-separated)" required>
-                <button type="submit" class="btn btn-primary">Start Scan</button>
-            </form>
-        </section>
-
-        <!-- Scans List -->
-        <section class="panel">
-            <h2>Scan Queue <span id="queue-count" class="badge">0</span></h2>
-            <div id="scan-list" class="list-container"></div>
-        </section>
-
-        <!-- Scheduled Scans -->
-        <section class="panel">
-            <h2>Scheduled Scans</h2>
-            <form id="schedule-form" class="schedule-form">
-                <input type="text" id="schedule-domain" placeholder="Domain to monitor" required>
-                <input type="number" id="schedule-interval" placeholder="Minutes" value="60" min="5">
-                <button type="submit" class="btn btn-secondary">Schedule</button>
-            </form>
-            <div id="scheduled-list" class="list-container"></div>
-        </section>
-
-        <!-- Findings -->
-        <section class="panel">
-            <h2>Findings</h2>
-            <div class="filter-bar">
-                <select id="severity-filter">
-                    <option value="">All Severities</option>
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                </select>
-            </div>
-            <div id="findings-list" class="list-container"></div>
-        </section>
-
-        <!-- Buckets -->
-        <section class="panel">
-            <h2>Buckets</h2>
-            <div id="buckets-list" class="list-container"></div>
-        </section>
-
-        <!-- Health -->
-        <section class="panel">
-            <h2>System Health</h2>
-            <div id="health-status" class="health-box">Checking...</div>
-        </section>
+        <div class="main">
+            <header class="topbar">
+                <h1 id="view-title" class="view-title">PROJECTS</h1>
+                <div class="user-area">
+                    <span class="user-chip"><span id="chip-user"></span><span id="chip-role" class="chip-role"></span></span>
+                    <button type="button" class="btn btn-ghost" data-action="logout">LOGOUT</button>
+                </div>
+            </header>
+            <main class="content">
+                <section id="view-projects" class="view" hidden></section>
+                <section id="view-project" class="view" hidden></section>
+                <section id="view-scans" class="view" hidden></section>
+                <section id="view-scan" class="view" hidden></section>
+                <section id="view-findings" class="view" hidden></section>
+                <section id="view-users" class="view" hidden></section>
+            </main>
+        </div>
     </div>
-
-    <footer class="app-footer">
-        <p>Festin S3 Monitor &mdash; Monitoring dashboard for discovered S3 buckets.</p>
-    </footer>
 
     <script src="/static/js/app.js"></script>
 </body>

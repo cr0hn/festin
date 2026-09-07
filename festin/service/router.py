@@ -281,16 +281,201 @@ class FestinRouter:
                 {"id": user["id"], "username": user["username"]}, status=201
             )
 
+        async def _admin_guard(request: web.Request) -> None:
+            """Raise 401/403 unless the caller is an authenticated admin."""
+            if self._auth is None:
+                return
+            if request.get("user") is None:
+                raise web.HTTPUnauthorized(
+                    text='{"error": "unauthorized"}',
+                    content_type="application/json",
+                )
+            current = await self._auth.verify(
+                request.headers.get("Authorization", "").removeprefix(
+                    "Bearer "
+                ).strip()
+            )
+            if current is None or current.get("role") != "admin":
+                raise web.HTTPForbidden(
+                    text='{"error": "forbidden"}',
+                    content_type="application/json",
+                )
+
+        async def _handle_list_projects(request: web.Request) -> web.Response:
+            data = await self._db.list_projects()
+            return web.json_response(data)
+
+        async def _handle_create_project(request: web.Request) -> web.Response:
+            await _admin_guard(request)
+            body = await _json_body(request)
+            name = body.get("name", "")
+            if not name:
+                raise web.HTTPBadRequest(reason="Missing 'name'")
+            try:
+                project_id = await self._db.create_project(
+                    name, body.get("description", "") or ""
+                )
+            except ValueError as exc:
+                return web.json_response({"error": str(exc)}, status=409)
+            project = await self._db.get_project(project_id)
+            return web.json_response(project, status=201)
+
+        async def _handle_get_project(request: web.Request) -> web.Response:
+            project_id = int(request.match_info["id"])
+            project = await self._db.get_project(project_id)
+            if project is None:
+                return web.json_response({"error": "not found"}, status=404)
+            domains = await self._db.list_domains(project_id=project_id)
+            return web.json_response({
+                "project": project,
+                "domains": domains["domains"],
+            })
+
+        async def _handle_patch_project(request: web.Request) -> web.Response:
+            await _admin_guard(request)
+            project_id = int(request.match_info["id"])
+            body = await _json_body(request)
+            project = await self._db.update_project(
+                project_id,
+                name=body.get("name"),
+                description=body.get("description"),
+            )
+            if project is None:
+                return web.json_response({"error": "not found"}, status=404)
+            return web.json_response(project)
+
+        async def _handle_delete_project(request: web.Request) -> web.Response:
+            await _admin_guard(request)
+            project_id = int(request.match_info["id"])
+            if project_id == 1:
+                return web.json_response(
+                    {"error": "cannot delete default project"}, status=400
+                )
+            deleted = await self._db.delete_project(project_id)
+            if not deleted:
+                return web.json_response({"error": "not found"}, status=404)
+            return web.json_response({"deleted": project_id})
+
+        async def _handle_create_domain(request: web.Request) -> web.Response:
+            await _admin_guard(request)
+            project_id = int(request.match_info["id"])
+            if await self._db.get_project(project_id) is None:
+                return web.json_response({"error": "not found"}, status=404)
+            body = await _json_body(request)
+            domain_name = body.get("domain_name", "")
+            if not domain_name:
+                raise web.HTTPBadRequest(reason="Missing 'domain_name'")
+            if await self._db.find_domain(domain_name) is not None:
+                return web.json_response(
+                    {"error": f"Domain '{domain_name}' already exists"},
+                    status=409,
+                )
+            domain_id = await self._db.create_domain(domain_name, project_id)
+            return web.json_response(
+                {"id": domain_id, "domain_name": domain_name,
+                 "project_id": project_id},
+                status=201,
+            )
+
+        async def _handle_list_project_domains(
+            request: web.Request,
+        ) -> web.Response:
+            project_id = int(request.match_info["id"])
+            data = await self._db.list_domains(project_id=project_id)
+            return web.json_response(data)
+
+        async def _handle_list_domains(request: web.Request) -> web.Response:
+            project_raw = request.query.get("project_id")
+            try:
+                project_id = int(project_raw) if project_raw else None
+            except ValueError:
+                raise web.HTTPBadRequest(reason="Invalid 'project_id'")
+            data = await self._db.list_domains(project_id=project_id)
+            return web.json_response(data)
+
+        async def _handle_delete_domain(request: web.Request) -> web.Response:
+            await _admin_guard(request)
+            domain_id = int(request.match_info["id"])
+            deleted = await self._db.delete_domain(domain_id)
+            if not deleted:
+                return web.json_response({"error": "not found"}, status=404)
+            return web.json_response({"deleted": domain_id})
+
+        async def _handle_list_users(request: web.Request) -> web.Response:
+            await _admin_guard(request)
+            users = await self._db.list_users()
+            return web.json_response({"users": users})
+
+        async def _handle_create_user(request: web.Request) -> web.Response:
+            await _admin_guard(request)
+            body = await _json_body(request)
+            try:
+                user = await self._auth.register(
+                    body.get("username", ""),
+                    body.get("password", ""),
+                    body.get("role", "viewer"),
+                )
+            except ValueError as exc:
+                return web.json_response({"error": str(exc)}, status=400)
+            return web.json_response(user, status=201)
+
+        async def _handle_patch_user(request: web.Request) -> web.Response:
+            await _admin_guard(request)
+            user_id = int(request.match_info["id"])
+            body = await _json_body(request)
+            role = body.get("role", "")
+            if role not in ("admin", "viewer"):
+                return web.json_response(
+                    {"error": "invalid role"}, status=400
+                )
+            updated = await self._db.set_user_role(user_id, role)
+            if not updated:
+                return web.json_response({"error": "not found"}, status=404)
+            user = await self._db.get_user(user_id)
+            return web.json_response(user)
+
+        async def _handle_delete_user(request: web.Request) -> web.Response:
+            await _admin_guard(request)
+            user_id = int(request.match_info["id"])
+            if request.get("user") is not None:
+                target = await self._db.get_user(user_id)
+                if target is not None and target["username"] == request["user"]:
+                    return web.json_response(
+                        {"error": "cannot delete yourself"}, status=400
+                    )
+            if await self._db.count_admins() <= 1:
+                target = await self._db.get_user(user_id)
+                if target is not None and target["role"] == "admin":
+                    return web.json_response(
+                        {"error": "cannot delete the last admin"}, status=400
+                    )
+            deleted = await self._db.delete_user(user_id)
+            if not deleted:
+                return web.json_response({"error": "not found"}, status=404)
+            return web.json_response({"deleted": user_id})
+
+        async def _handle_get_scan(request: web.Request) -> web.Response:
+            scan_id = int(request.match_info["id"])
+            detail = await self._db.get_scan_detail(scan_id)
+            if detail is None:
+                return web.json_response({"error": "not found"}, status=404)
+            return web.json_response(detail)
+
         async def _handle_stats(request: web.Request) -> web.Response:
             return web.json_response(await self._db.get_stats())
 
         async def _handle_list_scans(request: web.Request) -> web.Response:
             limit = request.query.get("limit")
+            project_raw = request.query.get("project_id")
+            status = request.query.get("status")
             try:
                 limit_int = int(limit) if limit else 100
+                project_id = int(project_raw) if project_raw else None
             except ValueError:
-                raise web.HTTPBadRequest(reason="Invalid 'limit'")
-            data = await self._db.get_all_scans(limit=limit_int)
+                raise web.HTTPBadRequest(reason="Invalid query parameter")
+            data = await self._db.list_scans(
+                project_id=project_id, status=status, limit=limit_int
+            )
             return web.json_response(data)
 
         async def _handle_delete_scan(request: web.Request) -> web.Response:
@@ -346,13 +531,18 @@ class FestinRouter:
             domains = body.get("domains", [])
             if not domains:
                 raise web.HTTPBadRequest(reason="Missing 'domains' list")
+            project_id = body.get("project_id", 1)
+            if not isinstance(project_id, int) or project_id < 1:
+                raise web.HTTPBadRequest(
+                    reason="'project_id' must be a positive integer"
+                )
 
-            async def _persist_scan(domain_name: str) -> int:
+            async def _persist_scan(domain_name: str, pid: int) -> int:
                 """Create (or reuse) the domain row and open a scan record."""
                 existing = await self._db.find_domain(domain_name)
                 domain_id = (
                     existing["domain_id"] if existing
-                    else await self._db.create_domain(domain_name)
+                    else await self._db.create_domain(domain_name, pid)
                 )
                 return await self._db.create_scan(domain_id)
 
@@ -360,6 +550,7 @@ class FestinRouter:
                 """Run festin's scan pipeline and persist the outcome."""
                 status = "completed"
                 buckets_found = findings_count = 0
+                await self._db.update_scan_status(scan_id, status="running")
                 try:
                     from festin.scan_runner import build_namespace, run_scan
 
@@ -369,6 +560,10 @@ class FestinRouter:
                         scan_id=f"svc-{scan_id}",
                     )
                     result_obj = await run_scan(cli_args, domain_list)
+                    if result_obj is not None:
+                        await self._db.persist_scan_results(
+                            scan_id, result_obj.buckets, result_obj.findings
+                        )
                     buckets_found = len(getattr(result_obj, "buckets", []) or [])
                     findings_count = len(getattr(result_obj, "findings", []) or [])
                 except Exception:
@@ -382,7 +577,7 @@ class FestinRouter:
 
             if self._scan_callback is not None:
                 await self._scan_callback(domains)
-                scan_id = await _persist_scan(domains[0])
+                scan_id = await _persist_scan(domains[0], project_id)
                 return web.json_response(
                     {"scan_id": scan_id, "status": "accepted"}, status=202
                 )
@@ -391,7 +586,7 @@ class FestinRouter:
                 raise web.HTTPServiceUnavailable(reason="No scan backend configured")
 
             job = await self._scheduler.enqueue(domains)
-            scan_id = await _persist_scan(domains[0])
+            scan_id = await _persist_scan(domains[0], project_id)
             asyncio.create_task(_execute_scan(scan_id, domains))
             return web.json_response(
                 {"scan_id": scan_id, "job_id": job.get("job_id"), "status": "accepted"},
@@ -407,6 +602,7 @@ class FestinRouter:
         app.router.add_post(f"{prefix}/auth/register", _handle_register)
         app.router.add_get(f"{prefix}/stats", _handle_stats)
         app.router.add_get(f"{prefix}/scans", _handle_list_scans)
+        app.router.add_get(f"{prefix}/scans/{{id}}", _handle_get_scan)
         app.router.add_delete(f"{prefix}/scans/{{id}}", _handle_delete_scan)
         app.router.add_get(f"{prefix}/findings", _handle_list_findings)
         app.router.add_get(f"{prefix}/buckets", _handle_list_buckets)
@@ -416,3 +612,20 @@ class FestinRouter:
             f"{prefix}/queues/schedule/{{id}}", _handle_delete_schedule
         )
         app.router.add_post(f"{prefix}/scans/run-scan", _handle_run_scan)
+        app.router.add_get(f"{prefix}/projects", _handle_list_projects)
+        app.router.add_post(f"{prefix}/projects", _handle_create_project)
+        app.router.add_get(f"{prefix}/projects/{{id}}", _handle_get_project)
+        app.router.add_patch(f"{prefix}/projects/{{id}}", _handle_patch_project)
+        app.router.add_delete(f"{prefix}/projects/{{id}}", _handle_delete_project)
+        app.router.add_post(
+            f"{prefix}/projects/{{id}}/domains", _handle_create_domain
+        )
+        app.router.add_get(
+            f"{prefix}/projects/{{id}}/domains", _handle_list_project_domains
+        )
+        app.router.add_get(f"{prefix}/domains", _handle_list_domains)
+        app.router.add_delete(f"{prefix}/domains/{{id}}", _handle_delete_domain)
+        app.router.add_get(f"{prefix}/users", _handle_list_users)
+        app.router.add_post(f"{prefix}/users", _handle_create_user)
+        app.router.add_patch(f"{prefix}/users/{{id}}", _handle_patch_user)
+        app.router.add_delete(f"{prefix}/users/{{id}}", _handle_delete_user)

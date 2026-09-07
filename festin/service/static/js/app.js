@@ -1,326 +1,217 @@
-/** FestIn Monitoring Dashboard — SPA Frontend */
+/** FestIn — S3 Exposure Monitor SPA (vanilla JS, hash routing) */
 
 (function () {
     "use strict";
 
-    const API_BASE = "/api/v1";
+    const API = "/api/v1";
     const TOKEN_KEY = "festin_token";
-    let refreshInterval;
+    const ROLE_KEY = "festin_role";
+    const POLL_MS = 15000;
+    const ARM_MS = 3000;
 
-     // -- Utility functions --
+    let pollTimer = null;
+    let pollRoute = null;
+    let registerMode = false;
+    let flashTimer = null;
+    let scanAutoTimer = null;
 
-    function getToken() {
-        return localStorage.getItem(TOKEN_KEY);
+    /* ---------- utilities ---------- */
+
+    function escapeHtml(str) {
+        return String(str == null ? "" : str).replace(/[&<>"']/g, (m) => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[m]);
     }
 
-    function setToken(token) {
-        if (token) {
-            localStorage.setItem(TOKEN_KEY, token);
-        } else {
-            localStorage.removeItem(TOKEN_KEY);
-        }
-    }
+    function $(id) { return document.getElementById(id); }
 
-    async function apiFetch(path, options = {}) {
-        const headers = { "Accept": "application/json", ...options.headers };
-        const token = getToken();
-        if (token) {
-            headers["Authorization"] = "Bearer " + token;
-        }
-        const resp = await fetch(API_BASE + path, { ...options, headers });
-        if (resp.status === 401) {
-            setToken(null);
-            showLogin();
-            throw new Error("Session expired — please sign in again");
-        }
-        if (!resp.ok) {
-            let msg = "HTTP " + resp.status;
-            try {
-                const body = await resp.json();
-                msg = body.error || msg;
-            } catch (_) {}
-            throw new Error(msg);
-        }
-        return resp.json();
-    }
-
-    function severityClass(sev) {
-        return "severity-" + (sev || "low");
-    }
-
-    let flashTimer;
     function showFlash(message, isError) {
-        let el = document.getElementById("flash-toast");
-        if (!el) {
-            el = document.createElement("div");
-            el.id = "flash-toast";
-            document.body.appendChild(el);
-        }
+        const el = $("flash-toast");
+        if (!el) return;
         el.textContent = message;
-        el.className = "flash-toast" + (isError ? " flash-error" : "");
+        el.hidden = false;
+        el.className = "flash" + (isError ? " flash-error" : " flash-ok");
         clearTimeout(flashTimer);
         flashTimer = setTimeout(() => { el.className += " flash-hidden"; }, 3500);
     }
 
-    function formatDate(ts) {
-        if (!ts) return "—";
+    function getToken() { return localStorage.getItem(TOKEN_KEY); }
+
+    function setToken(token) {
+        if (token) localStorage.setItem(TOKEN_KEY, token);
+        else localStorage.removeItem(TOKEN_KEY);
+    }
+
+    function getRole() { return localStorage.getItem(ROLE_KEY) || "viewer"; }
+
+    function setRole(role) {
+        if (role) localStorage.setItem(ROLE_KEY, role);
+        else localStorage.removeItem(ROLE_KEY);
+    }
+
+    function isAdmin() { return getRole() === "admin"; }
+
+    function fmtDate(ts) {
+        if (!ts) return "\u2014";
         const d = new Date(ts);
-        return d.toLocaleString();
+        return isNaN(d.getTime()) ? String(ts) : d.toISOString().replace("T", " ").slice(0, 19);
     }
 
-    // -- Rendering functions --
-
-     async function renderStats() {
-        try {
-            const data = await apiFetch("/stats");
-             document.getElementById("stat-scans").textContent = data.scan_count || 0;
-            document.getElementById("stat-findings").textContent = data.findings?.total || 0;
-            document.getElementById("stat-critical").textContent = data.findings?.critical || 0;
-            document.getElementById("stat-high").textContent = data.findings?.high || 0;
-         } catch (_) {}
+    function sevToken(sev) {
+        const s = String(sev || "low").toLowerCase();
+        const cls = { critical: "sev-critical", high: "sev-high", medium: "sev-medium", low: "sev-low", info: "sev-info" }[s] || "sev-low";
+        const label = { critical: "CRIT", high: "HIGH", medium: "MED", low: "LOW", info: "INFO" }[s] || s.toUpperCase();
+        return '<span class="sev ' + cls + '">' + escapeHtml(label) + "</span>";
     }
 
-     async function renderScanList() {
+    function statusToken(status) {
+        const s = String(status || "pending").toLowerCase();
+        const map = { pending: ["QUEUED", "tok-pending"], running: ["RUNNING", "tok-running"], completed: ["DONE", "tok-completed"], failed: ["FAIL", "tok-failed"] };
+        const m = map[s] || [s.toUpperCase(), "tok-pending"];
+        return '<span class="token ' + m[1] + '">[' + escapeHtml(m[0]) + "]</span>";
+    }
+
+    function emptyLine(msg, isError) {
+        return '<div class="' + (isError ? "empty-err" : "empty") + '">// ' + escapeHtml(msg) + "</div>";
+    }
+
+    /* ---------- api ---------- */
+
+    async function apiFetch(path, options) {
+        const opts = options || {};
+        const headers = Object.assign({ "Accept": "application/json" }, opts.headers || {});
+        const token = getToken();
+        if (token) headers["Authorization"] = "Bearer " + token;
+        let resp;
         try {
-             const data = await apiFetch("/scans?limit=20");
-            const el = document.getElementById("scan-list");
-             document.getElementById("queue-count").textContent = data.total || 0;
-            if (!data.scans || data.scans.length === 0) {
-                el.innerHTML = '<div class="empty-state">No scans yet</div>';
-                return;
-            }
-             el.innerHTML = data.scans.map((s) => `
-                 <div class="list-item">
-                     <div>
-                         <strong>${s.scan_id || s.id}</strong>
-                         <span style="color:#a0aec0;font-size:0.8rem;margin-left:0.5rem">${formatDate(s.started_at)}</span>
-                     </div>
-                     <button class="btn btn-sm btn-danger" onclick="deleteScan('${s.scan_id || s.id}')">Delete</button>
-                 </div>
-             `).join("");
-         } catch (_) {
-            el.innerHTML = '<div class="empty-state">Failed to load scans</div>';
+            resp = await fetch(API + path, Object.assign({}, opts, { headers }));
+        } catch (_) {
+            throw new Error("network error \u2014 service unreachable");
         }
-    }
-
-    async function deleteScan(scanId) {
-        if (!confirm("Delete scan " + scanId + "?")) return;
-        try {
-             await apiFetch("/scans/" + encodeURIComponent(scanId), { method: "DELETE" });
-            await renderScanList();
-            showFlash("Scan deleted");
-        } catch (err) {
-            showFlash("Error: " + escapeHtml(err.message), true);
-         }
-    }
-
-    async function renderFindings() {
-        try {
-             const sevFilter = document.getElementById("severity-filter").value;
-            const params = new URLSearchParams({ limit: "50" });
-            if (sevFilter) params.set("severity", sevFilter);
-            const data = await apiFetch("/findings?" + params.toString());
-            const el = document.getElementById("findings-list");
-             if (!data.findings || data.findings.length === 0) {
-                el.innerHTML = '<div class="empty-state">No findings</div>';
-                return;
-            }
-             el.innerHTML = data.findings.map((f) => `
-                 <div class="list-item">
-                     <div>
-                         <span class="severity-badge ${severityClass(f.severity)}">${f.severity}</span>
-                         <strong style="margin-left:0.5rem">${escapeHtml(f.rule_name || f.rule_id)}</strong>
-                         <span style="color:#718096;font-size:0.8rem;margin-left:0.5rem">@${escapeHtml(f.bucket_name || "?")}</span>
-                     </div>
-                     <div style="font-size:0.8rem;color:#a0aec0">${escapeHtml((f.match_redacted || f.match || "").substring(0, 40))}</div>
-                 </div>
-             `).join("");
-         } catch (_) {
-             el.innerHTML = '<div class="empty-state">Failed to load findings</div>';
+        if (resp.status === 401) {
+            clearSession();
+            route();
+            throw new Error("session expired");
         }
-    }
-
-     async function renderBuckets() {
-        try {
-             const data = await apiFetch("/buckets?limit=30");
-            const el = document.getElementById("buckets-list");
-            if (!data.buckets || data.buckets.length === 0) {
-                 el.innerHTML = '<div class="empty-state">No buckets found</div>';
-                return;
-            }
-             el.innerHTML = data.buckets.map((b) => `
-                 <div class="list-item">
-                     <span><strong>${escapeHtml(b.bucket_name)}</strong> @ ${escapeHtml(b.domain)}</span>
-                     <span style="font-size:0.8rem;color:#a0aec0">${b.scan_id || ""}</span>
-                 </div>
-             `).join("");
-         } catch (_) {
-             el.innerHTML = '<div class="empty-state">Failed to load buckets</div>';
-        }
-    }
-
-     async function renderScheduled() {
-        try {
-            const data = await apiFetch("/queues/schedule");
-             const el = document.getElementById("scheduled-list");
-            if (!data.scheduled || data.scheduled.length === 0) {
-                 el.innerHTML = '<div class="empty-state">No scheduled scans</div>';
-                return;
-            }
-             el.innerHTML = data.scheduled.map((s) => `
-                 <div class="list-item">
-                     <div>
-                         <strong>${escapeHtml(s.domain)}</strong>
-                         <span style="color:#718096;font-size:0.8rem;margin-left:0.5rem">every ${s.interval_minutes}m</span>
-                     </div>
-                     <button class="btn btn-sm btn-danger" onclick="removeScheduled(${s.id})">Remove</button>
-                 </div>
-             `).join("");
-         } catch (_) {
-            el.innerHTML = '<div class="empty-state">Failed to load schedules</div>';
-        }
-    }
-
-    async function removeScheduled(id) {
-        try {
-             await apiFetch("/queues/schedule/" + id, { method: "DELETE" });
-            await renderScheduled();
-         } catch (err) {
-            showFlash("Error: " + escapeHtml(err.message), true);
-        }
-    }
-
-     async function renderHealth() {
-         try {
-             const data = await apiFetch("/health");
-             const el = document.getElementById("health-status");
-            el.className = "health-box";
-             el.textContent = "Database: " + (data.db_path || "not configured") +
-                 " | Queues pending: " + (data.queues_pending ?? "?");
-         } catch (err) {
-             const el = document.getElementById("health-status");
-             el.className = "health-box error";
-            el.textContent = "Service unavailable: " + err.message;
-        }
-    }
-
-     // -- Event handlers --
-
-    function escapeHtml(str) {
-         return String(str || "").replace(/[&<>"']/g, (m) => ({
-             "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-          })[m]);
-    }
-
-    async function handleScanSubmit(e) {
-         e.preventDefault();
-        const input = document.getElementById("domains-input");
-        const domains = input.value.split(",").map((d) => d.trim()).filter(Boolean);
-        if (domains.length === 0) return;
-        try {
-             await apiFetch("/scans/run-scan", {
-                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                 body: JSON.stringify({ domains }),
-             });
-            showFlash("Scan started for: " + escapeHtml(domains.join(", ")));
-            input.value = "";
-            await renderScanList();
-        } catch (err) {
-            showFlash("Error starting scan: " + escapeHtml(err.message), true);
-         }
-    }
-
-    async function handleScheduleSubmit(e) {
-        e.preventDefault();
-        const domain = document.getElementById("schedule-domain").value.trim();
-         const interval = parseInt(document.getElementById("schedule-interval").value, 10) || 60;
-        if (!domain) return;
-        try {
-             await apiFetch("/queues/schedule", {
-                method: "POST",
-                 headers: { "Content-Type": "application/json" },
-                 body: JSON.stringify({ domain, interval_minutes: interval }),
-             });
-            document.getElementById("schedule-domain").value = "";
-             await renderScheduled();
-        } catch (err) {
-            showFlash("Error scheduling: " + escapeHtml(err.message), true);
-        }
-    }
-
-    // -- Auth --
-
-    function showLogin() {
-        // Stop polling while logged out (body does more than clear: resets handle)
-        if (refreshInterval) {
-            clearInterval(refreshInterval);
-            refreshInterval = undefined;
-        }
-        document.getElementById("dashboard").hidden = true;
-        document.getElementById("user-area").hidden = true;
-        document.getElementById("login-section").hidden = false;
-        document.getElementById("login-password").value = "";
-        const first = document.getElementById("login-username");
-        if (!first.value) first.focus();
-    }
-
-    function showDashboard(username) {
-        document.getElementById("login-section").hidden = true;
-        document.getElementById("dashboard").hidden = false;
-        document.getElementById("user-name").textContent = username;
-        document.getElementById("user-area").hidden = false;
-    }
-
-    function showLoginError(msg) {
-        const el = document.getElementById("login-error");
-        el.textContent = msg;
-        el.hidden = false;
-    }
-
-    function clearLoginError() {
-        const el = document.getElementById("login-error");
-        el.textContent = "";
-        el.hidden = true;
-    }
-
-    async function login(username, password) {
-        const resp = await fetch(API_BASE + "/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Accept": "application/json" },
-            body: JSON.stringify({ username, password }),
-        });
         if (!resp.ok) {
             let msg = "HTTP " + resp.status;
             try {
                 const body = await resp.json();
-                msg = body.error || msg;
+                if (body && body.error) msg = body.error;
+                else if (body && body.detail) msg = body.detail;
             } catch (_) {}
             throw new Error(msg);
         }
-        const data = await resp.json();
+        if (resp.status === 204) return null;
+        return resp.json();
+    }
+
+    /* ---------- session / auth ---------- */
+
+    function clearSession() {
+        setToken(null);
+        setRole(null);
+        stopPolling();
+        stopScanAuto();
+    }
+
+    function doLogout() {
+        clearSession();
+        location.hash = "#/login";
+        route();
+        showFlash("Signed out");
+    }
+
+    async function requestLogin(username, password) {
+        const data = await apiFetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: username, password: password }),
+        });
         setToken(data.access_token);
+        setRole(data.role || "viewer");
         return data;
     }
 
-    async function register(username, password) {
-        const resp = await fetch(API_BASE + "/auth/register", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Accept": "application/json" },
-            body: JSON.stringify({ username, password }),
-        });
-        if (!resp.ok) {
-            let msg = "HTTP " + resp.status;
-            try {
-                const body = await resp.json();
-                msg = body.error || msg;
-            } catch (_) {}
-            if (resp.status === 409 || resp.status === 403) {
+    async function requestRegister(username, password) {
+        try {
+            return await apiFetch("/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: username, password: password }),
+            });
+        } catch (err) {
+            const m = String(err.message || "");
+            if (err.status === 401 || err.status === 403 || err.status === 409 || /40[139]/.test(m)) {
                 throw new Error("Registration closed");
             }
-            throw new Error(msg);
+            throw err;
         }
-        return resp.json();
+    }
+
+    async function handleLoginSubmit(e) {
+        e.preventDefault();
+        const errEl = $("login-error");
+        errEl.hidden = true;
+        const username = ($("login-username").value || "").trim();
+        const password = $("login-password").value || "";
+        if (!username || !password) {
+            errEl.textContent = "// username and password required";
+            errEl.hidden = false;
+            return;
+        }
+        try {
+            if (registerMode) {
+                await requestRegister(username, password);
+                registerMode = false;
+                setRegisterMode();
+                await requestLogin(username, password);
+            } else {
+                await requestLogin(username, password);
+            }
+            enterShell();
+            location.hash = "#/projects";
+            route();
+            showFlash("signed in as " + username);
+        } catch (err) {
+            errEl.textContent = "// " + err.message;
+            errEl.hidden = false;
+        }
+    }
+
+    function setRegisterMode() {
+        const submit = $("login-submit");
+        const toggle = $("register-toggle");
+        const mode = $("login-mode");
+        if (!submit || !toggle || !mode) return;
+        if (registerMode) {
+            submit.textContent = "CREATE ACCOUNT";
+            toggle.textContent = "BACK TO SIGN IN";
+            mode.textContent = "// first account becomes ADMIN \u00b7 later registration is admin-only";
+        } else {
+            submit.textContent = "SIGN IN";
+            toggle.textContent = "CREATE ADMIN ACCOUNT";
+            mode.textContent = "// first account becomes ADMIN";
+        }
+        $("login-error").hidden = true;
+    }
+
+    function toggleRegister() {
+        registerMode = !registerMode;
+        setRegisterMode();
+    }
+
+    /* ---------- shell / nav ---------- */
+
+    function enterShell() {
+        $("view-login").hidden = true;
+        $("shell").hidden = false;
+        $("chip-user").textContent = usernameFromToken(getToken()) || "user";
+        const roleEl = $("chip-role");
+        roleEl.textContent = " \u00b7 " + getRole().toUpperCase();
+        const usersLink = document.querySelector('[data-nav="users"]');
+        if (usersLink) usersLink.hidden = !isAdmin();
+        refreshHealth();
     }
 
     function usernameFromToken(token) {
@@ -332,120 +223,785 @@
         }
     }
 
-    function logout() {
-        setToken(null);
-        showLogin();
+    function showLogin() {
+        $("shell").hidden = true;
+        $("view-login").hidden = false;
     }
 
-    let registerMode = false;
+    function setActiveNav(name) {
+        document.querySelectorAll(".nav-link").forEach((a) => {
+            a.classList.toggle("active", a.getAttribute("data-nav") === name);
+        });
+    }
 
-    async function handleLoginSubmit(e) {
-        e.preventDefault();
-        clearLoginError();
-        const username = document.getElementById("login-username").value.trim();
-        const password = document.getElementById("login-password").value;
-        if (!username || !password) {
-            showLoginError("Username and password are required");
+    function setTitle(t) { $("view-title").textContent = t; }
+
+    function refreshHealth() {
+        apiFetch("/health").then((h) => {
+            const pending = typeof h.pending === "number" ? h.pending : "\u2014";
+            const cls = typeof h.pending === "number" && h.pending > 0 ? "dot-busy" : "dot-ok";
+            $("health-strip").innerHTML =
+                '<span class="' + cls + '">\u25cf</span> SCHED OK \u00b7 PENDING ' + escapeHtml(String(pending));
+        }).catch(() => {
+            $("health-strip").innerHTML = '<span class="dot-err">\u25cf</span> SCHED ERR';
+        });
+    }
+
+    /* ---------- polling ---------- */
+
+    function stopPolling() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        pollRoute = null;
+    }
+
+    function armPolling(fn) {
+        stopPolling();
+        pollRoute = location.hash;
+        pollTimer = setInterval(fn, POLL_MS);
+    }
+
+    function stopScanAuto() {
+        if (scanAutoTimer) { clearInterval(scanAutoTimer); scanAutoTimer = null; }
+    }
+
+    /* ---------- two-step destructive arm ---------- */
+
+    function armButton(btn, onConfirm) {
+        if (btn.getAttribute("data-armed") === "1") {
+            btn.removeAttribute("data-armed");
+            btn.classList.remove("armed");
+            btn.textContent = btn.getAttribute("data-label") || "delete";
+            onConfirm();
             return;
         }
-        if (registerMode) {
-            await doRegister(username, password);
-        } else {
-            try {
-                await login(username, password);
-                startSession(username);
-            } catch (err) {
-                showLoginError("Sign in failed: " + err.message);
+        btn.setAttribute("data-armed", "1");
+        btn.classList.add("armed");
+        btn.setAttribute("data-label", btn.textContent);
+        btn.textContent = "confirm?";
+        setTimeout(() => {
+            if (btn.getAttribute("data-armed") === "1") {
+                btn.removeAttribute("data-armed");
+                btn.classList.remove("armed");
+                btn.textContent = btn.getAttribute("data-label") || "delete";
             }
-        }
+        }, ARM_MS);
     }
 
-    async function doRegister(username, password) {
+    /* ---------- rendering helpers ---------- */
+
+    function renderInto(id, html) { $(id).innerHTML = html; }
+
+    function escNum(v) { return escapeHtml(String(v == null ? 0 : v)); }
+
+    function tableHtml(headers, rowsHtml) {
+        return '<div class="tbl-wrap"><table><thead><tr>' +
+            headers.map((h) => {
+                const num = h.charAt(0) === "#" ? ' class="num"' : "";
+                return "<th" + num + ">" + escapeHtml(h.replace(/^#/, "")) + "</th>";
+            }).join("") +
+            "</tr></thead><tbody>" + (rowsHtml || "") + "</tbody></table></div>";
+    }
+
+    /* ---------- views: projects ---------- */
+
+    function renderProjectsShell() {
+        const view = $("view-projects");
+        view.hidden = false;
+        const admin = isAdmin();
+        view.innerHTML =
+            '<div class="section-head"><h2 class="panel-label">PROJECTS</h2></div>' +
+            (admin
+                ? '<form id="project-create-form" class="form-row" data-form="project-create">' +
+                  '<input id="np-name" placeholder="project name" required>' +
+                  '<input id="np-desc" placeholder="description (optional)">' +
+                  '<button class="btn btn-primary" type="submit">+ NEW PROJECT</button></form>'
+                : "") +
+            '<div id="projects-body">' + emptyLine("loading\u2026") + "</div>";
+        bindViewForms(view);
+    }
+
+    async function loadProjects() {
+        setTitle("PROJECTS");
+        setActiveNav("projects");
+        renderProjectsShell();
+        await loadProjectsTable();
+    }
+
+    async function loadProjectsTable() {
+        const admin = isAdmin();
         try {
-            await register(username, password);
-            // First user registered: try to sign in immediately
-            try {
-                await login(username, password);
-                startSession(username);
-            } catch (_) {
-                showLoginError("Account created — please sign in");
+            const data = await apiFetch("/projects");
+            const list = data.projects || [];
+            if (!list.length) {
+                renderInto("projects-body", emptyLine("no projects yet"));
+                return;
             }
-            registerMode = false;
-            resetAuthForm();
+            const rows = list.map((p) => {
+                const del = admin && p.id !== 1
+                    ? '<button class="btn btn-danger btn-sm" data-action="del-project" data-id="' + p.id + '" data-name="' + escapeHtml(p.name) + '">DELETE</button>'
+                    : "";
+                return "<tr class=\"clickable\" data-action=\"open-project\" data-id=\"" + p.id + "\">" +
+                    "<td>" + escapeHtml(p.name) + "</td>" +
+                    "<td>" + escapeHtml(p.description || "") + "</td>" +
+                    '<td class="num">' + escNum(p.domain_count) + "</td>" +
+                    '<td class="num">' + escNum(p.scan_count) + "</td>" +
+                    '<td class="num">' + escNum(p.findings_count) + "</td>" +
+                    "<td>" + escapeHtml(fmtDate(p.last_scan_at)) + "</td>" +
+                    "<td>" + del + "</td></tr>";
+            }).join("");
+            renderInto("projects-body", tableHtml(["NAME", "DESCRIPTION", "#DOMAINS", "#SCANS", "#FINDINGS", "LAST SCAN", ""], rows));
         } catch (err) {
-            showLoginError(err.message);
+            renderInto("projects-body", emptyLine(err.message, true));
         }
     }
 
-    function toggleRegisterMode() {
-        registerMode = !registerMode;
-        resetAuthForm();
+    async function submitProjectCreate() {
+        const name = ($("np-name").value || "").trim();
+        const description = ($("np-desc").value || "").trim();
+        if (!name) return;
+        try {
+            await apiFetch("/projects", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: name, description: description }),
+            });
+            showFlash("project created: " + name);
+            $("np-name").value = "";
+            $("np-desc").value = "";
+            await loadProjectsTable();
+        } catch (err) {
+            showFlash(err.message, true);
+        }
     }
 
-    function resetAuthForm() {
-        const btn = document.getElementById("login-submit");
-        const link = document.getElementById("register-toggle");
-        const title = document.getElementById("login-title");
-        if (btn) btn.textContent = registerMode ? "Create account" : "Sign in";
-        if (link) link.textContent = registerMode ? "Back to sign in" : "Create admin account";
-        if (title) title.textContent = registerMode ? "Create Admin Account" : "Sign in to Festin";
+    async function deleteProject(id) {
+        try {
+            await apiFetch("/projects/" + id, { method: "DELETE" });
+            showFlash("project " + id + " deleted");
+            await loadProjectsTable();
+        } catch (err) {
+            showFlash(err.message, true);
+        }
     }
 
-    async function refreshAll() {
-        await Promise.all([
-            renderStats(),
-            renderScanList(),
-            renderFindings(),
-            renderBuckets(),
-            renderScheduled(),
-            renderHealth(),
-        ]);
+    async function deleteProject(id) {
+        try {
+            await apiFetch("/projects/" + id, { method: "DELETE" });
+            showFlash("project " + id + " deleted");
+            await loadProjectsTable();
+        } catch (err) {
+            showFlash(err.message, true);
+        }
     }
 
-    function startSession(username) {
-        clearLoginError();
-        showDashboard(username);
-        refreshAll();
-        clearInterval(refreshInterval);
-        refreshInterval = setInterval(refreshAll, 30000);
+    /* ---------- views: project detail ---------- */
+
+    async function loadProjectDetail(id) {
+        setTitle("PROJECT " + id);
+        setActiveNav("projects");
+        stopScanAuto();
+        const view = $("view-project");
+        view.hidden = false;
+        const admin = isAdmin();
+        view.innerHTML = emptyLine("loading\u2026");
+        let data;
+        try {
+            data = await apiFetch("/projects/" + id);
+        } catch (err) {
+            view.innerHTML = emptyLine(err.message, true);
+            return;
+        }
+        const p = data.project || {};
+        const domains = data.domains || [];
+        const counts =
+            '<div class="count-strip">' +
+            '<div class="count-item"><span class="micro">DOMAINS</span><span class="count-value">' + escNum(p.domain_count) + "</span></div>" +
+            '<div class="count-item"><span class="micro">SCANS</span><span class="count-value">' + escNum(p.scan_count) + "</span></div>" +
+            '<div class="count-item"><span class="micro">FINDINGS</span><span class="count-value">' + escNum(p.findings_count) + "</span></div>" +
+            '<div class="count-item"><span class="micro">LAST SCAN</span><span class="count-value">' + escapeHtml(fmtDate(p.last_scan_at)) + "</span></div>" +
+            "</div>";
+
+        const domainRows = domains.length
+            ? domains.map((d) => {
+                const del = admin
+                    ? ' <button class="btn btn-danger btn-sm" data-action="del-domain" data-id="' + d.id + '">DEL</button>'
+                    : "";
+                return "<tr><td>" + escapeHtml(d.domain_name) + "</td>" +
+                    "<td>" + (d.enabled ? "yes" : "no") + "</td>" +
+                    "<td>" + escapeHtml(fmtDate(d.created_at)) + "</td>" +
+                    "<td>" + del + "</td></tr>";
+            }).join("")
+            : "";
+        const domainsHtml =
+            '<div class="section-head"><h2 class="panel-label">DOMAINS</h2>' +
+            (admin
+                ? '<button class="btn btn-primary" data-action="run-project-scan" data-id="' + id + '">RUN SCAN (ALL DOMAINS)</button>'
+                : "") +
+            "</div>" +
+            (admin
+                ? '<form class="form-row" data-form="add-domain" data-pid="' + id + '">' +
+                  '<input class="ad-domain" placeholder="example.com" required>' +
+                  '<button class="btn btn-primary" type="submit">+ ADD DOMAIN</button></form>'
+                : "") +
+            (domains.length ? tableHtml(["DOMAIN", "ENABLED", "CREATED", ""], domainRows) : emptyLine("no domains yet \u2014 add one, then run a scan"));
+
+        let schedHtml = '<div class="section-head"><h2 class="panel-label">SCHEDULED SCANS</h2></div>';
+        if (admin) {
+            const opts = domains.map((d) => '<option value="' + escapeHtml(d.domain_name) + '">' + escapeHtml(d.domain_name) + "</option>").join("");
+            schedHtml += '<form class="form-row" data-form="add-schedule" data-pid="' + id + '">' +
+                '<select class="sched-domain">' + (opts || '<option value="">\u2014 no domains \u2014</option>') + "</select>" +
+                '<input class="sched-interval" type="number" min="5" value="60" title="interval minutes"> <span class="mono-note">min</span>' +
+                '<button class="btn btn-primary" type="submit">+ SCHEDULE</button></form>';
+        }
+        schedHtml += '<div id="sched-list">' + emptyLine("loading\u2026") + "</div>";
+
+        view.innerHTML =
+            '<div class="section-head"><h2 class="view-title">' + escapeHtml(p.name || "PROJECT " + id) + "</h2>" +
+            (admin && p.id !== 1
+                ? '<button class="btn btn-danger" data-action="del-project" data-id="' + id + '" data-name="' + escapeHtml(p.name || "") + '">DELETE PROJECT</button>'
+                : "") +
+            "</div>" +
+            '<div class="section-head"><h2 class="panel-label">RECENT SCANS</h2></div>' +
+            '<div id="project-scans-body">' + emptyLine("loading\u2026") + "</div>" +
+            counts + domainsHtml + schedHtml;
+        bindViewForms(view);
+        loadProjectScansBody(id);
+        loadSchedulesFor(id);
     }
+
+    async function loadProjectScansBody(pid) {
+        const el = $("project-scans-body");
+        if (!el) return;
+        try {
+            const data = await apiFetch("/scans?project_id=" + encodeURIComponent(pid) + "&limit=20");
+            const list = data.scans || [];
+            if (!list.length) { el.innerHTML = emptyLine("no scans for this project yet"); return; }
+            const rows = list.map((s) =>
+                '<tr class="clickable" data-action="open-scan" data-id="' + s.scan_id + '">' +
+                "<td>" + statusToken(s.status) + "</td>" +
+                "<td>" + escapeHtml(s.domain_name || "\u2014") + "</td>" +
+                '<td class="num">' + escNum(s.buckets_found) + "</td>" +
+                '<td class="num">' + escNum(s.findings_count) + "</td>" +
+                "<td>" + escapeHtml(fmtDate(s.started_at)) + "</td></tr>").join("");
+            el.innerHTML = tableHtml(["STATUS", "DOMAIN", "#BUCKETS", "#FINDINGS", "STARTED"], rows);
+        } catch (err) {
+            el.innerHTML = emptyLine(err.message, true);
+        }
+    }
+
+    async function submitAddDomain(form) {
+        const pid = form.getAttribute("data-pid");
+        const input = form.querySelector(".ad-domain");
+        const domainName = (input.value || "").trim();
+        if (!domainName) return;
+        try {
+            await apiFetch("/projects/" + pid + "/domains", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ domain_name: domainName }),
+            });
+            showFlash("domain added: " + domainName);
+            loadProjectDetail(pid);
+        } catch (err) {
+            showFlash(err.message, true);
+        }
+    }
+
+    async function deleteDomain(id) {
+        try {
+            await apiFetch("/domains/" + id, { method: "DELETE" });
+            showFlash("domain deleted");
+            route();
+        } catch (err) {
+            showFlash(err.message, true);
+        }
+    }
+
+    async function runProjectScan(pid) {
+        let data;
+        try {
+            data = await apiFetch("/projects/" + pid);
+        } catch (err) {
+            showFlash(err.message, true);
+            return;
+        }
+        const domainNames = (data.domains || []).map((d) => d.domain_name);
+        if (!domainNames.length) {
+            showFlash("no domains in project \u2014 add one first", true);
+            return;
+        }
+        try {
+            await apiFetch("/scans/run-scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ domains: domainNames, project_id: Number(pid) }),
+            });
+            showFlash("scan accepted for " + domainNames.length + " domain(s)");
+            loadProjectDetail(pid);
+        } catch (err) {
+            showFlash(err.message, true);
+        }
+    }
+
+    /* ---------- schedules (per project + global queue) ---------- */
+
+    async function submitSchedule(form) {
+        const domain = form.querySelector(".sched-domain").value;
+        const interval = parseInt(form.querySelector(".sched-interval").value, 10) || 60;
+        if (!domain) return;
+        try {
+            await apiFetch("/queues/schedule", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ domain: domain, interval_minutes: interval }),
+            });
+            showFlash("scheduled: " + domain + " every " + interval + "m");
+            route();
+        } catch (err) {
+            showFlash(err.message, true);
+        }
+    }
+
+    async function loadSchedulesFor(pid) {
+        try {
+            const data = await apiFetch("/queues/schedule");
+            const list = data.scheduled || [];
+            const domainNames = new Set();
+            try {
+                const pd = await apiFetch("/projects/" + pid);
+                (pd.domains || []).forEach((d) => domainNames.add(d.domain_name));
+            } catch (_) {}
+            const mine = list.filter((s) => domainNames.has(s.domain));
+            const el = $("sched-list");
+            if (!el) return;
+            if (!mine.length) { el.innerHTML = emptyLine("no scheduled scans for this project"); return; }
+            el.innerHTML = tableHtml(["DOMAIN", "INTERVAL", "CREATED", ""], mine.map((s) =>
+                "<tr><td>" + escapeHtml(s.domain) + "</td>" +
+                '<td class="num">' + escNum(s.interval_minutes) + " min</td>" +
+                "<td>" + escapeHtml(fmtDate(s.created_at)) + "</td>" +
+                '<td><button class="btn btn-danger btn-sm" data-action="del-schedule" data-id="' + s.id + '">DEL</button></td></tr>'
+            ).join(""));
+        } catch (err) {
+            const el = $("sched-list");
+            if (el) el.innerHTML = emptyLine(err.message, true);
+        }
+    }
+
+    async function deleteSchedule(id) {
+        try {
+            await apiFetch("/queues/schedule/" + id, { method: "DELETE" });
+            showFlash("schedule removed");
+            route();
+        } catch (err) {
+            showFlash(err.message, true);
+        }
+    }
+
+    /* ---------- views: scans ---------- */
+
+    function renderScansShell() {
+        const view = $("view-scans");
+        view.hidden = false;
+        view.innerHTML =
+            '<div class="section-head"><h2 class="panel-label">SCAN QUEUE</h2></div>' +
+            '<form id="run-scan-form" class="form-row" data-form="run-scan">' +
+            '<input id="rs-domains" placeholder="domains, comma separated" required>' +
+            '<button class="btn btn-primary" type="submit">RUN SCAN</button></form>' +
+            '<div class="form-row">' +
+            '<select id="scan-f-project"><option value="">project: all</option></select>' +
+            '<select id="scan-f-status"><option value="">status: all</option>' +
+            '<option value="pending">pending</option><option value="running">running</option>' +
+            '<option value="completed">completed</option><option value="failed">failed</option></select>' +
+            "</div>" +
+            '<div id="scans-body">' + emptyLine("loading\u2026") + "</div>";
+        bindViewForms(view);
+        $("scan-f-status").addEventListener("change", loadScanTable);
+        apiFetch("/projects").then((projs) => {
+            const sel = $("scan-f-project");
+            if (!sel) return;
+            (projs.projects || []).forEach((p) => {
+                const opt = document.createElement("option");
+                opt.value = String(p.id);
+                opt.textContent = p.name;
+                sel.appendChild(opt);
+            });
+            sel.addEventListener("change", loadScanTable);
+        }).catch(() => {});
+    }
+
+    async function loadScans() {
+        setTitle("SCANS");
+        setActiveNav("scans");
+        renderScansShell();
+        await loadScanTable();
+    }
+
+    async function loadScanTable() {
+        const params = new URLSearchParams();
+        params.set("limit", "100");
+        const fproj = $("scan-f-project");
+        const fstat = $("scan-f-status");
+        if (fproj && fproj.value) params.set("project_id", fproj.value);
+        if (fstat && fstat.value) params.set("status", fstat.value);
+        try {
+            const data = await apiFetch("/scans?" + params.toString());
+            const list = data.scans || [];
+            if (!list.length) { renderInto("scans-body", emptyLine("no scans yet")); return; }
+            const rows = list.map((s) => {
+                const del = isAdmin()
+                    ? ' <button class="btn btn-danger btn-sm" data-action="del-scan" data-id="' + s.scan_id + '">DEL</button>'
+                    : "";
+                return '<tr class="clickable" data-action="open-scan" data-id="' + s.scan_id + '">' +
+                    "<td>" + statusToken(s.status) + "</td>" +
+                    "<td>" + escapeHtml(s.domain_name || "\u2014") + "</td>" +
+                    "<td>" + escapeHtml(s.project_name || "\u2014") + "</td>" +
+                    '<td class="num">' + escNum(s.buckets_found) + "</td>" +
+                    '<td class="num">' + escNum(s.findings_count) + "</td>" +
+                    "<td>" + escapeHtml(fmtDate(s.started_at)) + "</td>" +
+                    "<td>" + del + "</td></tr>";
+            }).join("");
+            renderInto("scans-body", tableHtml(["STATUS", "DOMAIN", "PROJECT", "#BUCKETS", "#FINDINGS", "STARTED", ""], rows));
+        } catch (err) {
+            renderInto("scans-body", emptyLine(err.message, true));
+        }
+    }
+
+    async function submitRunScan(e) {
+        e.preventDefault();
+        const raw = ($("rs-domains").value || "");
+        const domains = raw.split(",").map((d) => d.trim()).filter(Boolean);
+        if (!domains.length) return;
+        try {
+            await apiFetch("/scans/run-scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ domains: domains }),
+            });
+            showFlash("scan accepted: " + domains.join(", "));
+            $("rs-domains").value = "";
+            loadScanTable();
+        } catch (err) {
+            showFlash(err.message, true);
+        }
+    }
+
+    async function deleteScan(id) {
+        try {
+            await apiFetch("/scans/" + id, { method: "DELETE" });
+            showFlash("scan " + id + " deleted");
+            route();
+        } catch (err) {
+            showFlash(err.message, true);
+        }
+    }
+
+    /* ---------- views: scan detail ---------- */
+
+    async function loadScanDetail(id) {
+        setTitle("SCAN " + id);
+        setActiveNav("scans");
+        stopScanAuto();
+        const view = $("view-scan");
+        view.hidden = false;
+        view.innerHTML = emptyLine("loading\u2026");
+        let data;
+        try {
+            data = await apiFetch("/scans/" + id);
+        } catch (err) {
+            view.innerHTML = emptyLine(err.message, true);
+            return;
+        }
+        const s = data.scan || {};
+        const findings = data.findings || [];
+        const buckets = data.buckets || [];
+
+        const bucketRows = buckets.length
+            ? buckets.map((b) =>
+                "<tr><td>" + escapeHtml(b.name) + "</td>" +
+                '<td class="num">' + escNum(b.objects_count) + "</td></tr>").join("")
+            : "";
+        const bucketsHtml = buckets.length
+            ? '<div class="section-head"><h2 class="panel-label">BUCKETS (' + buckets.length + ')</h2></div>' +
+              tableHtml(["BUCKET", "#OBJECTS"], bucketRows)
+            : '<div class="section-head"><h2 class="panel-label">BUCKETS</h2></div>' + emptyLine("no buckets found");
+
+        const findingRows = findings.length
+            ? findings.map((f) =>
+                "<tr><td>" + sevToken(f.severity) + "</td>" +
+                "<td>" + escapeHtml(f.rule || "\u2014") + "</td>" +
+                "<td>" + escapeHtml(f.bucket || "\u2014") + "</td>" +
+                '<td class="snippet">' + escapeHtml(f.object || "\u2014") + "</td>" +
+                '<td class="num">' + (f.line == null ? "\u2014" : escNum(f.line)) + "</td>" +
+                '<td class="snippet">' + escapeHtml(f.match || "") + "</td></tr>").join("")
+            : "";
+        const findingsHtml = findings.length
+            ? '<div class="section-head"><h2 class="panel-label">FINDINGS (' + findings.length + ')</h2></div>' +
+              tableHtml(["SEVERITY", "RULE", "BUCKET", "OBJECT", "#LINE", "MATCH"], findingRows)
+            : '<div class="section-head"><h2 class="panel-label">FINDINGS</h2></div>' + emptyLine("no findings");
+
+        view.innerHTML =
+            '<div class="section-head"><h2 class="view-title">' + statusToken(s.status) +
+            ' <span class="mono-note">SCAN #' + escapeHtml(String(s.scan_id != null ? s.scan_id : id)) + "</span></h2>" +
+            '<button class="btn btn-ghost" data-action="back-scans">&larr; BACK</button></div>' +
+            '<div class="count-strip">' +
+            '<div class="count-item"><span class="micro">DOMAIN</span><span class="count-value">' + escapeHtml(s.domain_name || "\u2014") + "</span></div>" +
+            '<div class="count-item"><span class="micro">PROJECT</span><span class="count-value">' + escapeHtml(s.project_name || "\u2014") + "</span></div>" +
+            '<div class="count-item"><span class="micro">STARTED</span><span class="count-value">' + escapeHtml(fmtDate(s.started_at)) + "</span></div>" +
+            '<div class="count-item"><span class="micro">FINISHED</span><span class="count-value">' + escapeHtml(fmtDate(s.finished_at)) + "</span></div>" +
+            '<div class="count-item"><span class="micro">BUCKETS</span><span class="count-value">' + escNum(s.buckets_found) + "</span></div>" +
+            '<div class="count-item"><span class="micro">FINDINGS</span><span class="count-value">' + escNum(s.findings_count) + "</span></div>" +
+            "</div>" +
+            bucketsHtml + findingsHtml;
+
+        const st = String(s.status || "").toLowerCase();
+        if (st === "pending" || st === "running") {
+            scanAutoTimer = setTimeout(() => {
+                if (location.hash === "#/scan/" + id) loadScanDetail(id);
+            }, 4000);
+        }
+    }
+
+    /* ---------- views: findings ---------- */
+
+    async function loadFindings() {
+        setTitle("FINDINGS");
+        setActiveNav("findings");
+        const view = $("view-findings");
+        view.hidden = false;
+        view.innerHTML =
+            '<div class="section-head"><h2 class="panel-label">FINDINGS</h2></div>' +
+            '<div class="form-row"><select id="sev-filter">' +
+            '<option value="">severity: all</option>' +
+            '<option value="critical">critical</option><option value="high">high</option>' +
+            '<option value="medium">medium</option><option value="low">low</option>' +
+            "</select>" +
+            '<span class="mono-note">// keys: bucket, rule \u2014 redaction server-side</span></div>' +
+            '<div id="findings-body">' + emptyLine("loading\u2026") + "</div>";
+        $("sev-filter").addEventListener("change", loadFindingsTable);
+        await loadFindingsTable();
+    }
+
+    async function loadFindingsTable() {
+        const params = new URLSearchParams();
+        params.set("limit", "100");
+        const sel = $("sev-filter");
+        if (sel && sel.value) params.set("severity", sel.value);
+        try {
+            const data = await apiFetch("/findings?" + params.toString());
+            const list = data.findings || [];
+            if (!list.length) { renderInto("findings-body", emptyLine("no findings")); return; }
+            const rows = list.map((f) =>
+                "<tr><td>" + sevToken(f.severity) + "</td>" +
+                "<td>" + escapeHtml(f.rule || "\u2014") + "</td>" +
+                "<td>" + escapeHtml(f.bucket || "\u2014") + "</td>" +
+                '<td class="snippet">' + escapeHtml(f.object || "\u2014") + "</td>" +
+                '<td class="num">' + (f.line == null ? "\u2014" : escNum(f.line)) + "</td>" +
+                '<td class="snippet">' + escapeHtml(f.match || "") + "</td></tr>").join("");
+            renderInto("findings-body", tableHtml(["SEVERITY", "RULE", "BUCKET", "OBJECT", "#LINE", "MATCH"], rows));
+        } catch (err) {
+            renderInto("findings-body", emptyLine(err.message, true));
+        }
+    }
+
+    /* ---------- views: users ---------- */
+
+    function renderUsersShell() {
+        const view = $("view-users");
+        view.hidden = false;
+        view.innerHTML =
+            '<div class="section-head"><h2 class="panel-label">USERS</h2></div>' +
+            '<form class="form-row" data-form="create-user">' +
+            '<input class="cu-username" placeholder="username" required>' +
+            '<input class="cu-password" type="password" placeholder="password" required>' +
+            '<select class="cu-role"><option value="viewer">viewer</option><option value="admin">admin</option></select>' +
+            '<button class="btn btn-primary" type="submit">+ CREATE USER</button></form>' +
+            '<div id="users-body">' + emptyLine("loading\u2026") + "</div>";
+        bindViewForms(view);
+    }
+
+    async function loadUsers() {
+        setTitle("USERS");
+        setActiveNav("users");
+        renderUsersShell();
+        await loadUsersTable();
+    }
+
+    async function loadUsersTable() {
+        try {
+            const data = await apiFetch("/users");
+            const list = data.users || [];
+            const me = usernameFromToken(getToken());
+            if (!list.length) { renderInto("users-body", emptyLine("no users")); return; }
+            const rows = list.map((u) => {
+                const isSelf = u.username === me;
+                const roleSel = '<select data-role-for="' + u.id + '"' + (isSelf ? " disabled" : "") + ">" +
+                    '<option value="viewer"' + (u.role === "viewer" ? " selected" : "") + '>viewer</option>' +
+                    '<option value="admin"' + (u.role === "admin" ? " selected" : "") + '>admin</option></select>';
+                const del = !isSelf
+                    ? '<button class="btn btn-danger btn-sm" data-action="del-user" data-id="' + u.id + '">DEL</button>'
+                    : '<span class="mono-note">(you)</span>';
+                return "<tr><td>" + escapeHtml(u.username) + "</td><td>" + roleSel + "</td><td>" + del + "</td></tr>";
+            }).join("");
+            renderInto("users-body", tableHtml(["USERNAME", "ROLE", ""], rows));
+        } catch (err) {
+            renderInto("users-body", emptyLine(err.message, true));
+        }
+    }
+
+    async function submitCreateUser(form) {
+        const username = (form.querySelector(".cu-username").value || "").trim();
+        const password = form.querySelector(".cu-password").value || "";
+        const role = form.querySelector(".cu-role").value || "viewer";
+        if (!username || !password) return;
+        try {
+            await apiFetch("/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: username, password: password, role: role }),
+            });
+            showFlash("user created: " + username);
+            form.querySelector(".cu-username").value = "";
+            form.querySelector(".cu-password").value = "";
+            await loadUsersTable();
+        } catch (err) {
+            showFlash(err.message, true);
+        }
+    }
+
+    async function setUserRole(id, role) {
+        try {
+            await apiFetch("/users/" + id, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ role: role }),
+            });
+            showFlash("role updated: " + role);
+        } catch (err) {
+            showFlash(err.message, true);
+            loadUsersTable();
+        }
+    }
+
+    async function deleteUser(id) {
+        try {
+            await apiFetch("/users/" + id, { method: "DELETE" });
+            showFlash("user deleted");
+            await loadUsersTable();
+        } catch (err) {
+            showFlash(err.message, true);
+        }
+    }
+    /* ---------- forms binding ---------- */
+
+    function bindViewForms(root) {
+        root.querySelectorAll("form[data-form]").forEach((form) => {
+            if (form.getAttribute("data-bound") === "1") return;
+            form.setAttribute("data-bound", "1");
+            form.addEventListener("submit", (e) => {
+                e.preventDefault();
+                const kind = form.getAttribute("data-form");
+                if (kind === "project-create") submitProjectCreate();
+                else if (kind === "add-domain") submitAddDomain(form);
+                else if (kind === "add-schedule") submitSchedule(form);
+                else if (kind === "run-scan") submitRunScan(e);
+                else if (kind === "create-user") submitCreateUser(form);
+            });
+        });
+    }
+
+    /* ---------- delegated clicks ---------- */
+
+    async function handleDelegatedClick(e) {
+        const target = e.target.closest("[data-action]");
+        if (!target) return;
+        const action = target.getAttribute("data-action");
+        const id = target.getAttribute("data-id");
+
+        if (action === "open-project") { location.hash = "#/project/" + id; return; }
+        if (action === "open-scan") { location.hash = "#/scan/" + id; return; }
+        if (action === "back-scans") { location.hash = "#/scans"; return; }
+
+        if (action === "logout") { doLogout(); return; }
+        if (action === "toggle-register") { toggleRegister(); return; }
+
+        if (action === "run-project-scan") { runProjectScan(id); return; }
+
+
+        const confirmActions = {
+            "del-project": () => deleteProject(id),
+            "del-domain": () => deleteDomain(id),
+            "del-scan": () => deleteScan(id),
+            "del-schedule": () => deleteSchedule(id),
+            "del-user": () => deleteUser(id),
+        };
+        if (confirmActions[action]) {
+            e.stopPropagation();
+            armButton(target, confirmActions[action]);
+        }
+    }
+
+    /* ---------- router ---------- */
+
+    function route() {
+        stopScanAuto();
+        const hash = location.hash || "";
+        ["view-projects", "view-project", "view-scans", "view-scan", "view-findings", "view-users"].forEach((id) => { $(id).hidden = true; });
+
+        const logged = !!getToken();
+        if (!logged || hash.startsWith("#/login")) { showLogin(); stopPolling(); return; }
+        enterShell();
+
+        let m;
+        if ((m = hash.match(/^#\/project\/(\d+)$/))) { loadProjectDetail(m[1]); return; }
+        if ((m = hash.match(/^#\/scan\/(\d+)$/))) { loadScanDetail(m[1]); return; }
+        if (hash.startsWith("#/scans")) { loadScans(); return; }
+        if (hash.startsWith("#/findings")) { loadFindings(); return; }
+        if (hash.startsWith("#/users")) {
+            if (isAdmin()) loadUsers();
+            else { location.hash = "#/projects"; }
+            return;
+        }
+        loadProjects();
+    }
+
+    function startPollingForCurrentView() {
+        const hash = location.hash || "";
+        const map = {
+            "#/projects": loadProjectsTable,
+            "#/scans": loadScanTable,
+            "#/findings": loadFindingsTable,
+            "#/users": loadUsersTable,
+        };
+        if (map[hash]) armPolling(map[hash]);
+        else stopPolling();
+    }
+
+    /* ---------- init ---------- */
 
     function init() {
-        // Bind form handlers
-        document.getElementById("scan-form").addEventListener("submit", handleScanSubmit);
-        document.getElementById("schedule-form").addEventListener("submit", handleScheduleSubmit);
+        document.body.addEventListener("click", handleDelegatedClick);
+        document.body.addEventListener("change", handleDelegatedChange);
+        $("login-form").addEventListener("submit", handleLoginSubmit);
+        window.addEventListener("hashchange", () => { route(); startPollingForCurrentView(); });
 
-        // Auth bindings
-        document.getElementById("login-form").addEventListener("submit", handleLoginSubmit);
-        document.getElementById("logout-btn").addEventListener("click", logout);
-        document.getElementById("register-toggle").addEventListener("click", (e) => {
-            e.preventDefault();
-            toggleRegisterMode();
-        });
-
-        // Severity filter change
-        document.getElementById("severity-filter").addEventListener("change", renderFindings);
-
-        // Route to login or dashboard based on stored token
-        const token = getToken();
-        if (token) {
-            showDashboard(usernameFromToken(token));
-            refreshAll();
-            refreshInterval = setInterval(refreshAll, 30000);
+        if (getToken()) {
+            location.hash = location.hash || "#/projects";
         } else {
-            showLogin();
+            location.hash = "#/login";
         }
+        route();
+        startPollingForCurrentView();
     }
 
-     // Boot on DOM ready
-     if (document.readyState === "loading") {
+    function handleDelegatedChange(e) {
+        const sel = e.target.closest("[data-role-for]");
+        if (!sel) return;
+        setUserRole(sel.getAttribute("data-role-for"), sel.value);
+    }
+
+    if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", init);
     } else {
-         init();
+        init();
     }
-
-     // Expose for inline handlers
-     window.deleteScan = deleteScan;
-    window.removeScheduled = removeScheduled;
-
 })();
