@@ -97,7 +97,9 @@ uv run festin scan example.com --quiet --no-print --export sarif --output out.sa
 
 ### First-run bootstrap
 
-With an empty database the first `POST /api/v1/auth/register` creates the **admin**. After that, only an admin token can create more users (they get the `viewer` role; admins can promote them from the UI).
+With an empty database the first `POST /api/v1/auth/register` creates the
+**admin**. After that, only an admin token can create more users (they get
+the `viewer` role; admins can promote them from the UI).
 
 ```bash
 curl -X POST localhost:8420/api/v1/auth/register \
@@ -105,9 +107,10 @@ curl -X POST localhost:8420/api/v1/auth/register \
   -d '{"username": "admin", "password": "a-strong-password"}'
 ```
 
-??? warning "Demo credentials in the repo database"
-    The checked-in `data/festin.db` is demo state with known credentials
-    (`admin/admin123`). Delete it before any real use: `rm data/festin.db`.
+!!! note "No demo database is shipped"
+    The repo does not contain a pre-built database. On first start the
+    service creates an empty one — bootstrap the admin yourself with a
+    strong password before exposing the service.
 
 ### Reset everything
 

@@ -592,3 +592,8 @@ outdir
 results.festin
 .pytest_cache/
 site/
+
+# runtime data
+data/
+*.db
+!docs/**/*.png
