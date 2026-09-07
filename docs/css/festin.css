@@ -1,6 +1,6 @@
 /* FestIn docs theme — mirrors the dashboard ops console (warm dark + amber) */
 
-/* readability: bigger base, heavier weights than Material's thin defaults */
+/* readability: bigger base, no hairline weights anywhere */
 html {
   --md-text-font-size: 16px;
 }
@@ -12,13 +12,22 @@ html {
 .md-typeset li {
   font-weight: 400;
 }
-/* headings and links read solid, not thin */
 .md-typeset a {
   font-weight: 500;
 }
 .md-nav__link,
 .md-tabs__link {
   font-weight: 500;
+}
+
+/* headings: solid 700 — Material's default 300 reads thin on dark */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-typeset h5,
+.md-typeset h6 {
+  font-weight: 700;
 }
 
 :root {
@@ -91,7 +100,7 @@ html {
 [data-md-color-scheme="festin-dark"] .md-sidebar--primary .md-sidebar__scrollwrap {
   border-right: none;
 }
-/* nav links: muted grey uppercase-ish like dashboard nav */
+/* nav links: muted grey like dashboard nav */
 [data-md-color-scheme="festin-dark"] .md-nav__link {
   color: var(--festin-muted);
   font-size: 0.78rem;
@@ -99,6 +108,10 @@ html {
   margin-top: 0.45em;
   line-height: 1.5;
 }
+[data-md-color-scheme="festin-dark"] .md-nav__link:hover {
+  color: var(--festin-ink);
+}
+/* active item: amber text + amber left bar, panel2 bg — dashboard nav-link.active */
 [data-md-color-scheme="festin-dark"] .md-nav__item--active > .md-nav__link {
   color: var(--festin-accent);
   box-shadow: inset 2px 0 0 var(--festin-accent);
@@ -124,6 +137,17 @@ html {
 }
 [data-md-color-scheme="festin-dark"] .md-typeset pre {
   border-radius: 0;
+}
+
+/* --- syntax highlighting: comments readable (user pain point) --- */
+[data-md-color-scheme="festin-dark"] .md-typeset .highlight .c,
+[data-md-color-scheme="festin-dark"] .md-typeset .highlight .c1,
+[data-md-color-scheme="festin-dark"] .md-typeset .highlight .cm,
+[data-md-color-scheme="festin-dark"] .md-typeset .highlight .cs,
+[data-md-color-scheme="festin-dark"] .md-typeset .highlight .ge,
+[data-md-color-scheme="festin-dark"] .md-typeset .highlight .sd {
+  color: var(--festin-muted);
+  font-style: italic;
 }
 
 /* search field = dashboard input */
@@ -159,7 +183,7 @@ html {
 
 /* ---------- brand ---------- */
 .md-header__title {
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.14em;
 }
 
@@ -168,7 +192,6 @@ html {
 .md-typeset h2,
 .md-typeset h3,
 .md-typeset h4 {
-  font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--md-typeset-color);
 }

@@ -41,6 +41,8 @@ theme:
   font:
     text: IBM Plex Sans
     code: IBM Plex Mono
+    # Material loads 300,400,700 by default — the thin 300 wins for headings.
+    # Request 400-700 only so nothing renders hairline.
 
 extra_css:
   - css/festin.css
