@@ -9,6 +9,8 @@ copyright: Copyright &copy; 2026 cr0hn
 
 theme:
   name: material
+  logo: img/logo.png
+  favicon: img/favicon.ico
   features:
     - navigation.tabs
     - navigation.sections
@@ -35,21 +37,11 @@ theme:
       primary: custom
       accent: custom
       toggle:
-        icon: material/toggle-switch-off-outline
         icon: material/weather-sunny
-        icon: material/weather-night
-        icon: material/brightness-7
-        icon: material/brightness-4
-        toggle:
-          icon: material/weather-night
-          name: Switch to dark
+        name: Switch to dark
   font:
     text: IBM Plex Mono
     code: IBM Plex Mono
-  icon:
-    logo: material/shield-search
-    repo: fontawesome/brands/github
-  favicon: img/favicon.ico
 
 extra_css:
   - css/festin.css
@@ -60,9 +52,13 @@ nav:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
       - Local usage: getting-started/local.md
+  - Tutorials:
+      - Scanner: usage/tutorial-scanner.md
+      - Dashboard: usage/dashboard-tutorial.md
+  - How-to guides: usage/how-to.md
   - Usage:
-      - Scanner CLI: usage/scanner.md
-      - Dashboard: usage/dashboard.md
+      - Scanner CLI reference: usage/scanner.md
+      - Dashboard views: usage/dashboard.md
       - REST API reference: usage/api.md
       - Configuration: usage/configuration.md
   - Deployment:

@@ -12,9 +12,10 @@
   --festin-high: #ff9f43;
   --festin-medium: #ffd166;
   --festin-low: #7bd88f;
+  --festin-info: #6ea8fe;
 }
 
-/* ---------- dark scheme (default) ---------- */
+/* ---------- dark scheme (default, matches the dashboard) ---------- */
 [data-md-color-scheme="festin-dark"] {
   --md-default-bg-color: var(--festin-bg);
   --md-default-fg-color: var(--festin-ink);
@@ -23,25 +24,51 @@
   --md-default-fg-color--faint: var(--festin-muted);
   --md-typeset-color: var(--festin-ink);
   --md-typeset-a-color: var(--festin-accent);
-  --md-primary-bg-color: var(--festin-panel);
-  --md-primary-bg-color--light: var(--festin-ink);
-  --md-primary-fg-color: var(--festin-bg);
+  --md-primary-fg-color: var(--festin-panel);
+  --md-primary-bg-color: var(--festin-bg);
   --md-accent-fg-color: var(--festin-accent);
   --md-code-bg-color: var(--festin-panel);
   --md-code-fg-color: var(--festin-ink);
   --md-footer-bg-color: var(--festin-panel);
   --md-footer-fg-color: var(--festin-muted);
   --md-admonition-bg-color: var(--festin-panel);
+  --md-shadow-z1: 0 0 0 1px var(--festin-line);
+  --md-shadow-z2: 0 0 0 1px var(--festin-line);
 }
 
-[data-md-color-scheme="festin-dark"] .md-header,
+/* header = dashboard topbar: panel tone + 1px bottom line */
+[data-md-color-scheme="festin-dark"] .md-header {
+  background: var(--festin-panel);
+  border-bottom: 1px solid var(--festin-line);
+  box-shadow: none;
+}
 [data-md-color-scheme="festin-dark"] .md-tabs {
   background: var(--festin-panel);
   border-bottom: 1px solid var(--festin-line);
 }
+[data-md-color-scheme="festin-dark"] .md-tabs__link {
+  color: var(--festin-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+[data-md-color-scheme="festin-dark"] .md-tabs__link--active,
+[data-md-color-scheme="festin-dark"] .md-tabs__link:hover {
+  color: var(--festin-accent);
+}
 
+/* sidebar = dashboard sidebar: panel tone, nav links with amber active bar */
 [data-md-color-scheme="festin-dark"] .md-sidebar--primary {
   border-right: 1px solid var(--festin-line);
+}
+[data-md-color-scheme="festin-dark"] .md-nav__link {
+  color: var(--festin-muted);
+}
+[data-md-color-scheme="festin-dark"] .md-nav__item--active > .md-nav__link,
+[data-md-color-scheme="festin-dark"] .md-nav__link:hover {
+  color: var(--festin-ink);
+}
+[data-md-color-scheme="festin-dark"] .md-nav__item--active > .md-nav__link {
+  box-shadow: inset 2px 0 0 var(--festin-accent);
 }
 
 [data-md-color-scheme="festin-dark"] .md-typeset code {
@@ -52,14 +79,30 @@
 
 [data-md-color-scheme="festin-dark"] .md-typeset pre > code {
   border: 1px solid var(--festin-line);
+  border-radius: 0;
+}
+
+/* search field matches the dashboard inputs */
+[data-md-color-scheme="festin-dark"] .md-search__input {
+  background: var(--festin-bg);
+  border: 1px solid var(--festin-line);
+}
+
+/* header logo sizing (hex mark) */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 26px;
+  width: auto;
 }
 
 /* ---------- light scheme: same mono identity, paper tone ---------- */
 [data-md-color-scheme="festin-light"] {
   --md-primary-fg-color: #f4f2ec;
   --md-primary-bg-color: #1a1c20;
-  --md-accent-fg-color: #c77b18;
+  --md-default-bg-color: #fbfaf7;
+  --md-typeset-color: #23241f;
   --md-typeset-a-color: #c77b18;
+  --md-accent-fg-color: #c77b18;
   --md-code-bg-color: #f0eee7;
   --md-footer-bg-color: #1a1c20;
 }
@@ -80,7 +123,7 @@
 
 .md-typeset h1 {
   font-size: 1.7em;
-  border-bottom: 1px solid var(--md-default-fg-color--lightest, var(--festin-line));
+  border-bottom: 1px solid var(--festin-line);
   padding-bottom: 0.4em;
 }
 
@@ -89,11 +132,11 @@
   font-size: 0.72rem;
   border: 1px solid var(--festin-line);
 }
-[data-md-color-scheme="festin-dark"] .md-typeset table:not([class]) th {
+.md-typeset table:not([class]) th {
   background: var(--festin-panel2);
   border-bottom: 1px solid var(--festin-line);
 }
-[data-md-color-scheme="festin-dark"] .md-typeset table:not([class]) td {
+.md-typeset table:not([class]) td {
   border-bottom: 1px solid var(--festin-line);
 }
 
@@ -111,9 +154,3 @@
 .chip-warn { color: var(--festin-high); border-left-color: var(--festin-high); }
 .chip-crit { color: var(--festin-critical); border-left-color: var(--festin-critical); }
 .chip-info { color: var(--festin-accent); border-left-color: var(--festin-accent); }
-
-/* mermaid diagrams on dark */
-[data-md-color-scheme="festin-dark"] .mermaid,
-[data-md-color-scheme="festin-dark"] svg[role="graphics-document"] {
-  filter: none;
-}
