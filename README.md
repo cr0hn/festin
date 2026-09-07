@@ -50,11 +50,6 @@ trend chart and a REST API — in an industrial ops-console UI.
 
 ![Project detail](docs/img/dashboard-project.png)
 
-**Responsive** — the same console on a phone:
-
-<p align="center">
-  <a href="docs/img/dashboard-mobile.png"><img src="docs/img/dashboard-mobile.png" alt="Dashboard on mobile" width="280"></a>
-</p>
 
 ## What's new in 0.3
 
