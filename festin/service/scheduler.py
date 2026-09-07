@@ -53,14 +53,50 @@ class FestInScheduler:
                 pass
             self._loop_task = None
 
-    async def trigger_scan(self, domain_id: int, domain_name: str) -> dict[str, Any]:
-        """Manually trigger a scan for one domain."""
-        return {
+    async def trigger_scan(
+        self, domain_id: int, domain_name: str, options: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Manually trigger a scan for one domain and persist the result."""
+        scan_record_id = await self.database.create_scan(domain_id)
+        await self.database.update_scan_status(
+            scan_record_id, status="running"
+        )
+        result: dict[str, Any] = {
             "success": True,
             "domain_id": domain_id,
             "domain_name": domain_name,
+            "scan_id": scan_record_id,
+            "buckets_found": 0,
+            "findings_count": 0,
             "triggered_at": time.time(),
         }
+        try:
+            from festin.scan_runner import run_scan, build_namespace
+
+            opts = options or {}
+            cli_args = build_namespace(
+                concurrency=opts.get("concurrency", 5),
+                timeout=opts.get("timeout", 5),
+                cloud=opts.get("cloud", False),
+                permute=opts.get("permute", False),
+                secrets=opts.get("secrets", False),
+                quiet=True,
+                no_print=True,
+                scan_id=f"svc-{domain_id}-{int(time.time())}",
+            )
+            result_obj = await run_scan(cli_args, [domain_name])
+            result["buckets_found"] = len(getattr(result_obj, "buckets", []) or [])
+            result["findings_count"] = len(getattr(result_obj, "findings", []) or [])
+        except Exception as exc:
+            result["success"] = False
+            result["error"] = str(exc)
+        await self.database.update_scan_status(
+            scan_record_id,
+            status="completed" if result["success"] else "failed",
+            buckets_found=result["buckets_found"],
+            findings_count=result["findings_count"],
+        )
+        return result
 
     async def _scan_loop(self) -> None:
         """Periodic loop: check domains and trigger scans when due."""
@@ -118,3 +154,69 @@ class ScanOrchestrator:
             pass
 
         return result
+
+
+class Scheduler:
+    """Facade matching the service API: wraps FestInScheduler.
+
+    Exposes ``enqueue``, ``start``, ``stop`` and ``stats`` used by
+    ``festin/service/serve.py`` and ``festin/service/router.py``.
+    """
+
+    def __init__(self, database: Any = None, config: SchedulerConfig | None = None) -> None:
+        self._db = database
+        self._config = config or SchedulerConfig()
+        self._scheduler = FestInScheduler(database, config)
+        self._jobs: dict[str, dict[str, Any]] = {}
+
+    @property
+    def running(self) -> bool:
+        """Whether the scheduler loop is active."""
+        return self._scheduler.running
+
+    async def enqueue(self, domains: list[str]) -> dict[str, Any]:
+        """Register a scan job for the given domains. Returns job metadata."""
+        job_id = f"job-{int(time.time() * 1000)}"
+        job = {
+            "job_id": job_id,
+            "domains": list(domains),
+            "status": "pending",
+            "created_at": time.time(),
+        }
+        self._jobs[job_id] = job
+        return job
+
+    async def start(self, job_id: str | None = None) -> dict[str, Any] | None:
+        """Start the scheduler loop (or mark a specific job running)."""
+        if job_id is None:
+            await self._scheduler.start()
+            return None
+        job = self._jobs.get(job_id)
+        if job is not None:
+            job["status"] = "running"
+        return job
+
+    async def stop(self) -> None:
+        """Stop the scheduler loop."""
+        await self._scheduler.stop()
+
+    async def stats(self) -> dict[str, int]:
+        """Return job counts by status."""
+        pending = sum(1 for j in self._jobs.values() if j["status"] == "pending")
+        running = sum(1 for j in self._jobs.values() if j["status"] == "running")
+        completed = sum(1 for j in self._jobs.values() if j["status"] == "completed")
+        return {"pending": pending, "running": running, "completed": completed}
+
+    async def complete(self, job_id: str, result: dict[str, Any] | None = None) -> None:
+        """Mark a job completed."""
+        job = self._jobs.get(job_id)
+        if job is not None:
+            job["status"] = "completed"
+            job["result"] = result or {}
+
+    async def fail(self, job_id: str, error: str) -> None:
+        """Mark a job failed with an error message."""
+        job = self._jobs.get(job_id)
+        if job is not None:
+            job["status"] = "failed"
+            job["error"] = error

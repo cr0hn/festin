@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from pathlib import Path
 from typing import Any
-
-_DB_CONN: Any = None
 
 
 class Database:
@@ -20,14 +17,13 @@ class Database:
         self._conn: Any = None
 
     # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
+      # Lifecycle
+      # ------------------------------------------------------------------
 
     async def connect(self) -> None:
         """Open the database connection."""
-        global _DB_CONN
-        loop = asyncio.get_event_loop()
-        self._conn = await loop.run_in_executor(None, lambda: __import__('aiosqlite').connect(self._db_path))
+        import aiosqlite
+        self._conn = await aiosqlite.connect(self._db_path)
         self.connected = True
 
     async def disconnect(self) -> None:
@@ -45,13 +41,13 @@ class Database:
                 domain_name TEXT NOT NULL UNIQUE,
                 enabled INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL
-            );
+              );
 
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL
-            );
+              );
 
             CREATE TABLE IF NOT EXISTS scans (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,90 +58,90 @@ class Database:
                 findings_count INTEGER DEFAULT 0,
                 started_at TEXT NOT NULL,
                 finished_at TEXT
-            );
+              );
 
             CREATE INDEX IF NOT EXISTS idx_scans_domain ON scans(domain_id);
             CREATE INDEX IF NOT EXISTS idx_scans_status ON scans(status);
-        """
-        await self._conn.execute(query)
+          """
+        await self._conn.executescript(query)
         await self._conn.commit()
 
-    # ------------------------------------------------------------------
-    # Domain CRUD
-    # ------------------------------------------------------------------
+     # ------------------------------------------------------------------
+      # Domain CRUD
+      # ------------------------------------------------------------------
 
     async def create_domain(self, domain_name: str) -> int:
         """Insert a domain. Returns its id."""
-        now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         cursor = await self._conn.execute(
-            "INSERT INTO domains (domain_name, created_at) VALUES (?, ?)",
-            (domain_name, now),
-        )
+              "INSERT INTO domains (domain_name, created_at) VALUES (?, ?)",
+              (domain_name, now),
+          )
         await self._conn.commit()
         return cursor.lastrowid
 
     async def get_domain(self, domain_id: int) -> dict[str, Any] | None:
         """Return a domain dict or None."""
-        row = await self._conn.execute(
-            "SELECT id AS domain_id, domain_name FROM domains WHERE id = ?", (domain_id,)
-        )
-        row_data = await row.fetchone()
+        cursor = await self._conn.execute(
+              "SELECT id AS domain_id, domain_name FROM domains WHERE id = ?",
+              (domain_id,),
+          )
+        row_data = await cursor.fetchone()
         if row_data is None:
             return None
         return {"domain_id": row_data[0], "domain_name": row_data[1]}
 
     async def list_domains(self, offset: int = 0, limit: int = 100) -> dict[str, Any]:
         """Return paginated domain list with total count."""
-        count_row = await self._conn.execute("SELECT COUNT(*) FROM domains")
-        total = (await count_row.fetchone())[0]
+        count_cursor = await self._conn.execute("SELECT COUNT(*) FROM domains")
+        total = (await count_cursor.fetchone())[0]
 
-        row_iter = await self._conn.execute(
-            "SELECT id AS domain_id, domain_name FROM domains ORDER BY id LIMIT ? OFFSET ?",
-            (limit, offset),
-        )
-        rows = [
-            {"domain_id": r[0], "domain_name": r[1]}
-            async for r in row_iter
-        ]
+        row_cursor = await self._conn.execute(
+              "SELECT id AS domain_id, domain_name FROM domains ORDER BY id LIMIT ? OFFSET ?",
+              (limit, offset),
+          )
+        rows = []
+        for row in await row_cursor.fetchall():
+            rows.append({"domain_id": row[0], "domain_name": row[1]})
         return {"total": total, "domains": rows}
 
     async def delete_domain(self, domain_id: int) -> bool:
         """Delete a domain. Returns True if deleted."""
         cursor = await self._conn.execute(
-            "DELETE FROM domains WHERE id = ?", (domain_id,)
-        )
+              "DELETE FROM domains WHERE id = ?", (domain_id,)
+          )
         await self._conn.commit()
         return cursor.rowcount > 0
 
-    # ------------------------------------------------------------------
-    # Users
-    # ------------------------------------------------------------------
+     # ------------------------------------------------------------------
+      # Users
+      # ------------------------------------------------------------------
 
     async def user_exists(self) -> bool:
         """True if at least one user exists."""
-        count_row = await self._conn.execute("SELECT COUNT(*) FROM users")
-        return (await count_row.fetchone())[0] > 0
+        count_cursor = await self._conn.execute("SELECT COUNT(*) FROM users")
+        return (await count_cursor.fetchone())[0] > 0
 
     async def create_user(self, username: str, password_hash: str) -> int:
         """Create a user. Returns its id."""
         cursor = await self._conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
-        )
+              "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+              (username, password_hash),
+          )
         await self._conn.commit()
         return cursor.lastrowid
 
-    # ------------------------------------------------------------------
-    # Scan CRUD
-    # ------------------------------------------------------------------
+     # ------------------------------------------------------------------
+      # Scan CRUD
+      # ------------------------------------------------------------------
 
     async def create_scan(self, domain_id: int, scanner: str = "svc-001") -> int:
         """Create a scan record. Returns its id."""
-        now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         cursor = await self._conn.execute(
-            "INSERT INTO scans (domain_id, scanner_name, started_at) VALUES (?, ?, ?)",
-            (domain_id, scanner, now),
-        )
+              "INSERT INTO scans (domain_id, scanner_name, started_at) VALUES (?, ?, ?)",
+              (domain_id, scanner, now),
+          )
         await self._conn.commit()
         return cursor.lastrowid
 
@@ -155,90 +151,93 @@ class Database:
         status: str = "completed",
         buckets_found: int = 0,
         findings_count: int = 0,
-    ) -> bool:
+      ) -> bool:
         """Update scan metadata. Returns True if updated."""
-        now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         cursor = await self._conn.execute(
-            "UPDATE scans SET status=?, finished_at=?, buckets_found=?, findings_count=? WHERE id=?",
-            (status, now, buckets_found, findings_count, scan_id),
-        )
+              "UPDATE scans SET status=?, finished_at=?, buckets_found=?, findings_count=? WHERE id=?",
+              (status, now, buckets_found, findings_count, scan_id),
+          )
         await self._conn.commit()
         return cursor.rowcount > 0
 
     async def get_all_scans(self, offset: int = 0, limit: int = 100) -> dict[str, Any]:
         """Return all scans with total count."""
-        count_row = await self._conn.execute(
-            "SELECT COUNT(*) FROM scans"
-        )
-        total = (await count_row.fetchone())[0]
+        count_cursor = await self._conn.execute("SELECT COUNT(*) FROM scans")
+        total = (await count_cursor.fetchone())[0]
 
-        row_iter = await self._conn.execute(
-            "SELECT id, domain_id, scanner_name, status, buckets_found, findings_count, started_at, finished_at FROM scans ORDER BY id DESC LIMIT ? OFFSET ?",
-            (limit, offset),
-        )
+        row_cursor = await self._conn.execute(
+              "SELECT id, domain_id, scanner_name, status, buckets_found, findings_count, started_at, finished_at FROM scans ORDER BY id DESC LIMIT ? OFFSET ?",
+              (limit, offset),
+          )
         rows = []
-        async for r in row_iter:
+        for row in await row_cursor.fetchall():
             rows.append({
-                "scan_id": r[0],
-                "domain_id": r[1],
-                "scanner_name": r[2],
-                "status": r[3],
-                "buckets_found": r[4],
-                "findings_count": r[5],
-                "started_at": r[6],
-                "finished_at": r[7],
-            })
+                  "scan_id": row[0],
+                  "domain_id": row[1],
+                  "scanner_name": row[2],
+                  "status": row[3],
+                  "buckets_found": row[4],
+                  "findings_count": row[5],
+                  "started_at": row[6],
+                  "finished_at": row[7],
+              })
         return {"scans": rows, "total": total}
 
-    # ------------------------------------------------------------------
-    # Dashboard
-    # ------------------------------------------------------------------
+     # ------------------------------------------------------------------
+      # Dashboard
+      # ------------------------------------------------------------------
 
     async def get_dashboard_overview(self) -> dict[str, Any]:
         """Build a dashboard overview with domain and scan statistics."""
-        # Total domains
-        cnt = await self._conn.execute("SELECT COUNT(*) FROM domains")
-        total_domains = (await cnt.fetchone())[0]
+          # Total domains
+        count1 = await self._conn.execute("SELECT COUNT(*) FROM domains")
+        total_domains = (await count1.fetchone())[0]
 
-        # Active domains (enabled=1)
-        cnt2 = await self._conn.execute("SELECT COUNT(*) FROM domains WHERE enabled=1")
-        active_domains = (await cnt2.fetchone())[0]
+          # Active domains (enabled=1)
+        count2 = await self._conn.execute(
+              "SELECT COUNT(*) FROM domains WHERE enabled=1"
+          )
+        active_domains = (await count2.fetchone())[0]
 
-        # Total scans
-        cnt3 = await self._conn.execute("SELECT COUNT(*) FROM scans")
-        total_scans = (await cnt3.fetchone())[0]
+          # Total scans
+        count3 = await self._conn.execute("SELECT COUNT(*) FROM scans")
+        total_scans = (await count3.fetchone())[0]
 
-        # Total buckets found
-        row_iter = await self._conn.execute("SELECT COALESCE(SUM(buckets_found), 0) FROM scans")
-        total_buckets = (await row_iter.fetchone())[0]
+          # Total buckets found
+        row1 = await self._conn.execute(
+              "SELECT COALESCE(SUM(buckets_found), 0) FROM scans"
+          )
+        total_buckets = (await row1.fetchone())[0]
 
-        # Total findings
-        row_iter = await self._conn.execute("SELECT COALESCE(SUM(findings_count), 0) FROM scans")
-        total_findings = (await row_iter.fetchone())[0]
+          # Total findings
+        row2 = await self._conn.execute(
+              "SELECT COALESCE(SUM(findings_count), 0) FROM scans"
+          )
+        total_findings = (await row2.fetchone())[0]
 
-        # Per-domain stats
+          # Per-domain stats
+        domain_cursor = await self._conn.execute(
+              "SELECT d.id, d.domain_name, COUNT(s.id), "
+              "SUM(s.buckets_found), SUM(s.findings_count) "
+              "FROM domains d LEFT JOIN scans s ON d.id = s.domain_id "
+              "GROUP BY d.id ORDER BY d.id LIMIT 50"
+          )
         domains_rows = []
-        row_iter = await self._conn.execute(
-            """
-            SELECT d.id, d.domain_name, COUNT(s.id), SUM(s.buckets_found), SUM(s.findings_count)
-            FROM domains d LEFT JOIN scans s ON d.id = s.domain_id
-            GROUP BY d.id ORDER BY d.id LIMIT 50
-            """
-        )
-        async for r in row_iter:
+        for row in await domain_cursor.fetchall():
             domains_rows.append({
-                "domain_id": r[0],
-                "domain_name": r[1],
-                "scan_count": r[2] or 0,
-                "total_buckets": r[3] or 0,
-                "total_findings": r[4] or 0,
-            })
+                  "domain_id": row[0],
+                  "domain_name": row[1],
+                  "scan_count": row[2] if row[2] is not None else 0,
+                  "total_buckets": row[3] if row[3] is not None else 0,
+                  "total_findings": row[4] if row[4] is not None else 0,
+              })
 
         return {
-            "total_domains": total_domains,
-            "active_domains": active_domains,
-            "total_scans": total_scans,
-            "total_buckets_found": total_buckets,
-            "total_findings": total_findings,
-            "domains": domains_rows,
-        }
+              "total_domains": total_domains,
+              "active_domains": active_domains,
+              "total_scans": total_scans,
+              "total_buckets_found": total_buckets or 0,
+              "total_findings": total_findings or 0,
+              "domains": domains_rows,
+          }

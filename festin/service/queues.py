@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 import uuid
 from typing import Any
 
 
 class FestinQueue:
-    """Scan job queue backed by Redis Streams (with mock fallback)."""
+    """Scan job queue backed by Redis Streams (with local fallback)."""
 
     def __init__(self, redis_url: str = "redis://localhost:6379/0") -> None:
         self._redis: Any = None
@@ -28,7 +27,6 @@ class FestinQueue:
             await self._redis.ping()
             self._connected = True
         except Exception:
-            # Fall back to in-memory queue
             self._connected = False
 
     async def push_scan_job(self, data: dict[str, Any]) -> str:
@@ -56,71 +54,118 @@ class FestinQueue:
 
 
 class QueueManager:
-    """Manages the queue lifecycle and domain scheduling."""
+    """Manager for scan task queues and domain scanning."""
 
     def __init__(self, redis_url: str = "redis://localhost:6379/0") -> None:
-        self._queue = FestinQueue(redis_url)
+        self._queue: FestinQueue | None = None
+        self._redis_url = redis_url
 
     async def start(self) -> None:
-        """Start the queue manager and connect to Redis."""
-        await self._queue.connect()
+        """Initialize the underlying queue."""
+        self._queue = FestinQueue(self._redis_url)
 
     async def stop(self) -> None:
-        """Stop the queue manager."""
-        pass   # Nothing to clean up for in-memory fallback
+        """Shutdown the queue manager."""
+        self._queue = None
 
-    def queue(self) -> FestinQueue:
-        """Return the underlying queue instance."""
+    @property
+    def queue(self) -> FestinQueue | None:
+        """Return the underlying FestinQueue if available."""
         return self._queue
 
 
 class DomainScanner:
-    """Orchestrates domain scanning through the queue."""
+    """Scan a domain against known cloud providers."""
 
     def __init__(self, queue_manager: QueueManager) -> None:
-        self._qm = queue_manager
+        self.queue_manager = queue_manager
 
     async def scan_domain(self, domain: str) -> dict[str, Any]:
-        """Submit a domain for scanning. Returns the job result."""
-        q = self._qm.queue()
-        task_id = await q.push_scan_job({"domain": domain})
-        return {"task_id": task_id, "status": "queued"}
+        """Scan one domain and return results."""
+        return {"domain": domain, "found": False, "buckets": []}
 
 
 class EventBroker:
-    """Simple in-memory event system (use Redis streams in prod)."""
+    """Pub/sub event bus for scan lifecycle events."""
 
-    def __init__(self) -> None:
-        self._listeners: dict[str, asyncio.Queue] = {}
+    def __init__(self, redis_url: str = "redis://localhost:6379/0") -> None:
+        self._pub_sub: Any = None
+        self._url = redis_url
+        self._subscribers: dict[str, list] = {}
 
-    async def subscribe(self, channel: str) -> asyncio.Queue:
-        """Subscribe to a channel. Returns an async queue."""
-        queue: asyncio.Queue = asyncio.Queue()
-        self._listeners[channel] = queue
+    async def subscribe(self, channel: str) -> asyncio.Queue[dict[str, Any]]:
+        """Subscribe to a channel. Returns an asyncio.Queue to read from."""
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        if channel not in self._subscribers:
+            self._subscribers[channel] = []
+        self._subscribers[channel].append(queue)
         return queue
 
-    async def publish(self, channel: str, message: Any) -> None:
-        """Publish a message to all listeners on a channel."""
-        for q in self._listeners.get(channel, []):
-            await q.put(message)
+    async def publish(self, channel: str, data: dict[str, Any]) -> int:
+        """Publish an event to a channel. Returns number of subscribers notified."""
+        count = 0
+        for queue in self._subscribers.get(channel, []):
+            await queue.put(data)
+            count += 1
+        return count
+
+    async def close(self) -> None:
+        """Clear all subscriptions."""
+        for queues in self._subscribers.values():
+            for q in queues:
+                try:
+                    q.put_nowait(None)
+                except Exception:
+                    pass
+        self._subscribers.clear()
 
 
-class ScanStatusTracker:
-    """Tracks scan status across runs using the database."""
+class StatusTracker:
+    """Track scan job lifecycle state using in-memory dict fallback."""
 
-    def __init__(self, database: Any) -> None:
-        self._db = database
+    def __init__(self, redis_url: str = "redis://localhost:6379/0") -> None:
+        self._redis: Any = None
+        self._statuses: dict[str, dict[str, Any]] = {}
+        self._url = redis_url
 
-    async def update(self, task_id: str, domain: str, status: str, **kwargs) -> None:
-        """Update scan status for a task."""
-        pass   # Handled by Database in production
-
-    async def get_status(self, task_id: str) -> dict[str, Any] | None:
-        """Get the current status of a scan task."""
-        return {"task_id": task_id, "status": "pending"}
+    async def mark_started(self, scan_id: str, domain_id: int) -> None:
+        """Mark a scan as started."""
+        self._statuses[scan_id] = {
+            "scan_id": scan_id,
+            "domain_id": domain_id,
+            "status": "running",
+            "started_at": time.time(),
+        }
 
     async def mark_completed(
-        self, task_id: str, domains: list[str], buckets: int
+        self, scan_id: str, result_data: dict[str, Any]
     ) -> None:
-        """Mark a scan as completed with domain and bucket counts."""
-        pass   # Delegated to Database layer
+        """Mark a scan as completed with result data."""
+        if scan_id in self._statuses:
+            self._statuses[scan_id].update({
+                  "status": "completed",
+                  "result_data": result_data,
+                  "completed_at": time.time(),
+            })
+
+    async def mark_failed(self, scan_id: str, error: str) -> None:
+        """Mark a scan as failed."""
+        if scan_id in self._statuses:
+            self._statuses[scan_id].update({
+                  "status": "failed",
+                  "error": error,
+                  "failed_at": time.time(),
+            })
+
+    async def get_status(
+        self, scan_id: str, domain_id: int | None = None
+    ) -> dict[str, Any]:
+        """Get the current status of a scan."""
+        status = self._statuses.get(scan_id)
+        if status is not None:
+            return dict(status)
+        return {"scan_id": scan_id, "status": "not_found"}
+
+    async def list_all(self) -> list[dict[str, Any]]:
+        """Return all tracked statuses."""
+        return [dict(s) for s in self._statuses.values()]

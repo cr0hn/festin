@@ -5,12 +5,10 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from aiohttp import web
-
 try:
-    import bcrypt
+    from passlib.context import CryptContext
 except ImportError:
-    bcrypt = None  # type: ignore
+    CryptContext = None  # type: ignore
 
 try:
     from jose import JWTError, jwt
@@ -28,18 +26,15 @@ class PasswordHasher:
     """Sync bcrypt hashing — fast enough for async context."""
 
     def __init__(self) -> None:
-        if bcrypt is None:
-            raise ImportError("bcrypt not installed. pip install bcrypt")
+        if CryptContext is None:
+            raise ImportError("passlib[bcrypt] not installed. pip install passlib[bcrypt]")
+        self._ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
     def hash_password(self, password: str) -> str:
-        pw_bytes = password.encode()[:72]
-        return bcrypt.hashpw(pw_bytes, bcrypt.gensalt()).decode()
+        return self._ctx.hash(password)
 
     def verify_password(self, password: str, hashed: str) -> bool:
-        try:
-            return bcrypt.checkpw(password.encode()[:72], hashed.encode())
-        except ValueError:
-            return False
+        return self._ctx.verify(password, hashed)
 
 
 class TokenService:
@@ -118,52 +113,3 @@ class AuthService:
             return None
         return {"id": row["id"], "username": row["username"],
                 "role": row["role"]}
-
-
-class AuthMiddleware:
-    """aiohttp middleware for optional basic auth from a users file.
-
-    Users file format (one per line): ``username:password``. When no file
-    is provided, the middleware allows all requests (open mode).
-    """
-
-    def __init__(self, users: dict[str, str] | None = None) -> None:
-        self._users = users or {}
-        self._hasher = PasswordHasher()
-
-    @classmethod
-    def from_file(cls, path: Any) -> AuthMiddleware:
-        """Build middleware from a ``username:password`` lines file."""
-        users: dict[str, str] = {}
-        try:
-            with open(path) as fh:
-                for raw in fh:
-                    line = raw.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    username, _, password = line.partition(":")
-                    if username and password:
-                        users[username] = password
-        except OSError:
-            pass
-        return cls(users)
-
-    @web.middleware
-    async def __call__(self, request: web.Request, handler: Any) -> web.StreamResponse:
-        """Check basic auth credentials against the users dict."""
-        if not self._users:
-            return await handler(request)
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Basic "):
-            raise web.HTTPUnauthorized(headers={"WWW-Authenticate": "Basic"})
-        import base64
-
-        try:
-            decoded = base64.b64decode(auth_header[6:]).decode()
-            username, _, password = decoded.partition(":")
-        except Exception:
-            raise web.HTTPUnauthorized(headers={"WWW-Authenticate": "Basic"})
-        expected = self._users.get(username)
-        if expected is None or not secrets.compare_digest(password, expected):
-            raise web.HTTPUnauthorized(headers={"WWW-Authenticate": "Basic"})
-        return await handler(request)

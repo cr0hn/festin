@@ -60,7 +60,7 @@ class TestDatabaseDomainCRUD:
             await database.create_domain(f"domain-{i}.com")
         # Default page (first 100)
         result = await database.list_domains(offset=0, limit=100)
-        assert result["total"] == 5 + 1     # +1 from earlier test
+        assert result["total"] == 5
 
     async def test_delete_domain(self, database):
         domain_id = await database.create_domain("to-delete.com")
@@ -210,6 +210,7 @@ class TestScanOrchestrator:
 
         db = Database(db_path)
         await db.connect()
+        await db.migrate()
         domain_id = await db.create_domain("orch-test.com")
 
         orchestrator = ScanOrchestrator(db)

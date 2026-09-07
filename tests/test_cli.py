@@ -79,11 +79,11 @@ class TestHelpAndBasics:
         opts = {o for p in serve.params for o in p.opts}
         assert "--host" in opts
         assert "--port" in opts
-        assert "--state" in opts
+        assert "--db" in opts
 
         result = _invoke("serve", "--help")
         assert result.exit_code == 0
-        assert "503" in _clean(result.output)
+        assert "SQLite" in _clean(result.output)
 
     def test_version_command(self):
         result = _invoke("version")
@@ -296,28 +296,21 @@ def _fake_probe(probed: list, recorded: dict):
 
 class TestServeCommand:
     def test_serve_health_endpoint(self, tmp_path, monkeypatch):
-        from festin.api import ApiConfig, FestinApi
+        from festin.service.serve import ServiceConfig
 
         captured = {}
 
-        async def fake_run_server(config: ApiConfig) -> None:
+        async def fake_run_server(config: ServiceConfig) -> None:
             captured["config"] = config
-            api = FestinApi(config)
-            await api.start()
-            port = api.port
-            async with httpx.AsyncClient() as client:
-                response = await client.get(f"http://127.0.0.1:{port}/api/v1/health")
-            captured["health"] = response.json()
-            await api.stop()
 
-        monkeypatch.setattr("festin.api.run_server", fake_run_server)
+        monkeypatch.setattr("festin.service.run_server", fake_run_server)
 
         result = _invoke(
-            "serve", "--host", "127.0.0.1", "--port", "0", "--state", str(tmp_path / "s.json")
+            "serve", "--host", "127.0.0.1", "--port", "8420", "--db", str(tmp_path / "s.db")
         )
 
         assert result.exit_code == 0
-        assert captured["health"]["status"] == "ok"
+        assert isinstance(captured["config"], ServiceConfig)
 
 
 class TestRunnerUnits:

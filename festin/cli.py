@@ -291,13 +291,13 @@ def serve(
     db_path: Annotated[
         Path | None,
         typer.Option("--db", help="SQLite database path for persistent storage."),
-      ] = None,
+    ] = None,
 ) -> None:
-     """Start the FestIn REST API server with SQLite backend and SPA frontend.
+    """Start the FestIn REST API server with SQLite backend and SPA frontend.
 
     Endpoints live under /api/v1 (scans, findings, buckets, health, queues).
     A monitoring dashboard SPA is served at the root path.
-     """
+    """
     from festin.service import ServiceConfig, run_server
 
     config = ServiceConfig(host=host, port=port, db_path=db_path)

@@ -45,6 +45,11 @@ def test_all_package_files_parse():
     assert len(sources) >= 8
 
     seen = {str(f) for f, _ in _iter_functions(Path("festin"))}
-    constant_only = {"festin/__init__.py", "festin/black_list.py", "festin/logo.py"}
+    constant_only = {
+        "festin/__init__.py",
+        "festin/black_list.py",
+        "festin/logo.py",
+        "festin/service/__init__.py",
+    }
     expected = {str(f) for f in sources if str(f) not in constant_only}
     assert seen == expected

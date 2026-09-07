@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>FestIn Monitor</title>
+   <script src="https://cdn.tailwindcss.com"></script>
+   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+   <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+
+<!-- LOGIN PAGE -->
+<div x-data="loginForm()" x-show="!$root.authenticated" x-cloak class="flex items-center justify-center min-h-screen">
+   <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-96">
+     <div class="text-center mb-6">
+       <h1 class="text-3xl font-bold text-green-400">FestIn</h1>
+       <p class="text-gray-400 mt-2">Bucket Discovery Dashboard</p>
+     </div>
+     <form @submit.prevent="login()" class="space-y-4">
+       <input x-model="username" type="text" placeholder="Username" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-green-400 text-white" required>
+       <input x-model="password" type="password" placeholder="Password" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-green-400 text-white" required>
+       <button type="submit" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded transition">Login</button>
+     </form>
+     <div x-show="error" x-text="error" class="mt-4 text-red-400 text-center text-sm"></div>
+   </div>
+</div>
+
+<!-- DASHBOARD -->
+<div x-data="festinApp()" x-show="authenticated" class="min-h-screen flex flex-col">
+   <!-- Top bar -->
+   <header class="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+     <div class="flex items-center gap-4">
+       <h1 class="text-xl font-bold text-green-400">FestIn Monitor</h1>
+       <nav class="hidden md:flex gap-2">
+         <button @click="view = 'dashboard'" :class="view === 'dashboard' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'" class="px-3 py-1 rounded transition">Dashboard</button>
+         <button @click="view = 'domains'" :class="view === 'domains' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'" class="px-3 py-1 rounded transition">Domains</button>
+       </nav>
+     </div>
+     <div class="flex items-center gap-4">
+       <span class="text-sm text-gray-400" x-text="'Welcome, ' + username"></span>
+       <button @click="logout()" class="text-sm text-gray-400 hover:text-red-400 transition">Logout</button>
+     </div>
+   </header>
+
+   <main class="flex-1 p-6 overflow-auto">
+     <!-- Dashboard View -->
+     <div x-show="view === 'dashboard'">
+       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+         <div class="bg-gray-800 p-6 rounded-lg shadow"><p class="text-sm text-gray-400">Total Domains</p><p class="text-3xl font-bold text-white" x-text="overview?.total_domains ?? 0"></p></div>
+         <div class="bg-gray-800 p-6 rounded-lg shadow"><p class="text-sm text-gray-400">Active Scans</p><p class="text-3xl font-bold text-green-400" x-text="overview?.active_domains ?? 0"></p></div>
+         <div class="bg-gray-800 p-6 rounded-lg shadow"><p class="text-sm text-gray-400">Buckets Found</p><p class="text-3xl font-bold text-blue-400" x-text="overview?.total_buckets_found ?? 0"></p></div>
+         <div class="bg-gray-800 p-6 rounded-lg shadow"><p class="text-sm text-gray-400">Critical Findings</p><p class="text-3xl font-bold text-red-400" x-text="overview?.critical_findings ?? 0"></p></div>
+       </div>
+
+       <h2 class="text-lg font-semibold mb-4">Monitored Domains</h2>
+       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+         <template x-for="dom in (overview?.domains ?? [])" :key="dom.domain">
+           <div class="bg-gray-800 p-6 rounded-lg shadow hover:bg-gray-750 transition cursor-pointer" @click="$root.goToDomain(dom)">
+             <div class="flex items-center justify-between mb-3">
+               <h3 class="text-lg font-bold text-white truncate" x-text="dom.domain"></h3>
+               <span class="px-2 py-1 text-xs rounded bg-green-600" x-show="(dom.total_scans ?? 0) > 0">Active</span>
+             </div>
+             <div class="text-sm text-gray-400 space-y-1">
+               <p><span class="text-gray-500">Scans:</span> <span x-text="dom.total_scans ?? 0"></span></p>
+               <p><span class="text-gray-500">Buckets:</span> <span x-text="dom.buckets_total ?? 0"></span></p>
+               <p><span class="text-gray-500">Findings:</span> <span x-text="dom.findings_count ?? 0"></span></p>
+             </div>
+           </div>
+         </template>
+         <div x-show="(overview?.domains ?? []).length === 0" class="col-span-full text-center text-gray-500 py-12">No domains configured yet. Go to Domains to add one.</div>
+       </div>
+     </div>
+
+     <!-- Domains Management View -->
+     <div x-show="view === 'domains'">
+       <h2 class="text-lg font-semibold mb-4">Domain Management</h2>
+       <form @submit.prevent="addDomain()" class="bg-gray-800 p-6 rounded-lg shadow mb-6 flex gap-4 items-end">
+         <div class="flex-1"><label class="text-sm text-gray-400 block mb-1">Domain Name</label><input x-model="newDomainName" type="text" placeholder="example.com" class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-green-400 text-white" required></div>
+         <button type="submit" class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded transition">Add Domain</button>
+       </form>
+
+       <table class="w-full bg-gray-800 rounded-lg shadow">
+         <thead><tr class="text-left text-gray-400 border-b border-gray-700"><th class="px-4 py-3">Domain</th><th class="px-4 py-3">Scans</th><th class="px-4 py-3">Buckets</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Actions</th></tr></thead>
+         <tbody>
+           <template x-for="dom in (overview?.domains ?? [])" :key="dom.domain">
+             <tr class="border-b border-gray-700 hover:bg-gray-750">
+               <td class="px-4 py-3 font-medium" x-text="dom.domain"></td>
+               <td class="px-4 py-3 text-gray-400" x-text="dom.total_scans ?? 0"></td>
+               <td class="px-4 py-3 text-blue-400" x-text="dom.buckets_total ?? 0"></td>
+               <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded bg-green-600" x-show="(dom.total_scans ?? 0) > 0">Active</span><span class="px-2 py-1 text-xs rounded bg-gray-600" x-show="(dom.total_scans ?? 0) === 0">Idle</span></td>
+               <td class="px-4 py-3 flex gap-2"><button @click="$root.rescanDomain(dom)" class="text-sm bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded transition">Rescan</button><button @click="removeDomain(dom.id)" class="text-sm bg-red-600 hover:bg-red-500 px-3 py-1 rounded transition">Remove</button></td>
+             </tr>
+           </template>
+         </tbody>
+       </table>
+     </div>
+   </main>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

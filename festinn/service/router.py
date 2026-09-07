@@ -23,7 +23,6 @@ logger = logging.getLogger("festin.service.router")
 # Helpers
 # ---------------------------------------------------------------------------
 
-
 async def _json_body(request: web.Request) -> dict[str, Any]:
     """Parse request body as JSON."""
     try:
@@ -41,29 +40,21 @@ def _scan_response(
     """Build a scan response dict from a ScanResult."""
     if result is None:
         return {"scan_id": scan_id, "status": status}
-    data = result.to_dict()
-    data["scan_id"] = scan_id
-    data["status"] = status
-    return data
+    return {**result.to_dict(), "scan_id": scan_id, "status": status}
 
 
 # ---------------------------------------------------------------------------
 # Health endpoint
 # ---------------------------------------------------------------------------
 
-
 async def health_check(request: web.Request) -> web.Response:
     """Simple health check that responds with 200 OK."""
-    return web.json_response({
-        "status": "ok",
-        "version": "0.2.0",
-    })
+    return web.json_response({"status": "ok", "version": "0.2.0"})
 
 
 # ---------------------------------------------------------------------------
 # Domain management endpoints
 # ---------------------------------------------------------------------------
-
 
 async def domain_list(request: web.Request) -> web.Response:
     """List all domains in the database."""
@@ -98,7 +89,6 @@ async def domain_remove(request: web.Request) -> web.Response:
 # Scan execution endpoints
 # ---------------------------------------------------------------------------
 
-
 async def scan_start(request: web.Request) -> web.Response:
     """Trigger a new scan for all domains."""
     qm = request.app["queue"]
@@ -108,10 +98,7 @@ async def scan_start(request: web.Request) -> web.Response:
     for dom in domains:
         res = await qm.queue().push_scan_job({"domain": dom})
         results.append(res)
-    return web.json_response({
-        "scan_id": "batch-1",
-        "tasks": results,
-    })
+    return web.json_response({"scan_id": "batch-1", "tasks": results})
 
 
 async def scan_status(request: web.Request) -> web.Response:
@@ -126,7 +113,6 @@ async def scan_status(request: web.Request) -> web.Response:
 # ---------------------------------------------------------------------------
 # Scheduler endpoints
 # ---------------------------------------------------------------------------
-
 
 async def scheduler_status(request: web.Request) -> web.Response:
     """Get the current scheduler status."""
@@ -159,7 +145,6 @@ async def scheduler_stop(request: web.Request) -> web.Response:
 # Router factory
 # ---------------------------------------------------------------------------
 
-
 def create_router(
     database: Database,
     queue_manager: QueueManager,
@@ -176,7 +161,7 @@ def create_router(
     routes.post("/api/v1/domains")(domain_add)
     routes.delete("/api/v1/domains")(domain_remove)
 
-    # Scan execution
+    # Scan execution  
     routes.post("/api/v1/scans")(scan_start)
     routes.post("/api/v1/scans/status")(scan_status)
 
@@ -189,8 +174,7 @@ def create_router(
 
 
 async def setup_app(
-    database: Database,
-    scheduler: Scheduler | None = None,
+    database: Database, scheduler: Scheduler | None = None
 ) -> web.AppRunner:
     """Set up and start the FestIn monitoring dashboard app."""
     qm = QueueManager()
@@ -206,44 +190,3 @@ async def setup_app(
     app.add_routes(router)
 
     return web.AppRunner(app)
-
-
-class FestinRouter:
-    """HTTP router exposing the FestIn monitoring dashboard API."""
-
-    def __init__(
-        self,
-        database: Database,
-        queue_manager: QueueManager | None = None,
-        scheduler: Scheduler | None = None,
-        scan_callback: Callable[[list[str]], Awaitable[ScanResult]] | None = None,
-    ) -> None:
-        self._db = database
-        self._queues = queue_manager
-        self._scheduler = scheduler
-        self._scan_callback = scan_callback
-
-    def add_routes(self, app: web.Application, prefix: str = "/api/v1") -> None:
-        """Register all API routes on the given aiohttp application."""
-
-        async def _handle_health(request: web.Request) -> web.Response:
-            pending = 0
-            if self._scheduler is not None and hasattr(self._scheduler, "stats"):
-                pending = (await self._scheduler.stats()).get("pending", 0)
-            return web.json_response({"status": "ok", "pending": pending})
-
-        async def _handle_create_scan(request: web.Request) -> web.Response:
-            body = await _json_body(request)
-            domains = body.get("domains", [])
-            if not domains:
-                raise web.HTTPBadRequest(reason="Missing 'domains' list")
-            if self._scan_callback is not None:
-                await self._scan_callback(domains)
-            return web.json_response({"scan_id": "api-0", "status": "accepted"}, status=202)
-
-        async def _handle_list_scans(request: web.Request) -> web.Response:
-            return web.json_response({"scans": [], "total": 0})
-
-        app.router.add_get(f"{prefix}/health", _handle_health)
-        app.router.add_post(f"{prefix}/scans", _handle_create_scan)
-        app.router.add_get(f"{prefix}/scans", _handle_list_scans)
