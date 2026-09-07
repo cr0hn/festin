@@ -307,6 +307,7 @@ def serve(
     except KeyboardInterrupt:
         print("[*] Stopping FestIn service")
 
+
 def _warn_if_no_regex(domain_regex: str | None) -> None:
     if domain_regex:
         return

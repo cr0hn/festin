@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from .scheduler import FestInScheduler, ScanOrchestrator, SchedulerConfig
 from .serve import ServiceConfig, run_server
-from .scheduler import FestInScheduler, SchedulerConfig, ScanOrchestrator
 
 __all__ = (
     "Database",

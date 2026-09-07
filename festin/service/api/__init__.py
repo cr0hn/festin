@@ -1,4 +1,5 @@
 """festin/service/api - Route injection and dependency getters."""
+
 from __future__ import annotations
 
 from typing import Any

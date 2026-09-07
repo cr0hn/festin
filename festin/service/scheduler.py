@@ -61,9 +61,7 @@ class FestInScheduler:
     ) -> dict[str, Any]:
         """Manually trigger a scan for one domain and persist the result."""
         scan_record_id = await self.database.create_scan(domain_id)
-        await self.database.update_scan_status(
-            scan_record_id, status="running"
-        )
+        await self.database.update_scan_status(scan_record_id, status="running")
         result: dict[str, Any] = {
             "success": True,
             "domain_id": domain_id,
@@ -74,7 +72,7 @@ class FestInScheduler:
             "triggered_at": time.time(),
         }
         try:
-            from festin.scan_runner import run_scan, build_namespace
+            from festin.scan_runner import build_namespace, run_scan
 
             opts = options or {}
             cli_args = build_namespace(
@@ -127,12 +125,9 @@ class FestInScheduler:
                         continue
                     existing = await db.find_domain(domain)
                     domain_id = (
-                        existing["domain_id"] if existing
-                        else await db.create_domain(domain)
+                        existing["domain_id"] if existing else await db.create_domain(domain)
                     )
-                    logger.info(
-                        "Scheduled scan %s firing for %s", entry_id, domain
-                    )
+                    logger.info("Scheduled scan %s firing for %s", entry_id, domain)
                     asyncio.create_task(self.trigger_scan(domain_id, domain))
             except asyncio.CancelledError:
                 break
@@ -146,7 +141,12 @@ class ScanOrchestrator:
     def __init__(self, database: Any) -> None:
         self.database = database
 
-    async def run_scan(self, domain_id: int, domain_name: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def run_scan(
+        self,
+        domain_id: int,
+        domain_name: str,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Run a scan for one domain."""
         result = {
             "success": True,
@@ -158,23 +158,24 @@ class ScanOrchestrator:
         # Try to delegate to the real scan_runner if available
         try:
             from festin import scan_runner
+
             runner = getattr(scan_runner, "run_scan", None)
             if runner is not None and asyncio.iscoroutinefunction(runner):
-                args = type("Args", (), {
-                    "concurrency": 5,
-                    "no_links": False,
-                    "http_timeout": 5,
-                    "debug": False,
-                    "profile": None,
-                    "permute": False,
-                    "no_dnsdiscover": False,
-                })()
-                buckets = []
-                findings = []
+                args = type(
+                    "Args",
+                    (),
+                    {
+                        "concurrency": 5,
+                        "no_links": False,
+                        "http_timeout": 5,
+                        "debug": False,
+                        "profile": None,
+                        "permute": False,
+                        "no_dnsdiscover": False,
+                    },
+                )()
                 await runner(args, domain_name, 0, asyncio.Queue(), asyncio.Queue())
                 result["success"] = True
-            else:
-                pass
         except Exception:
             pass
 
@@ -182,7 +183,12 @@ class ScanOrchestrator:
         try:
             scan_id = await self.database.create_scan(domain_id)
             if scan_id:
-                await self.database.update_scan_status(scan_id, status="completed", buckets_found=0, findings_count=0)
+                await self.database.update_scan_status(
+                    scan_id,
+                    status="completed",
+                    buckets_found=0,
+                    findings_count=0,
+                )
         except Exception:
             pass
 

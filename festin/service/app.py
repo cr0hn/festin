@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from typing import Any
 
-
 SERVICE_VERSION = "0.2.0"
 
 
@@ -29,8 +28,8 @@ class FestInApp:
 
     async def startup(self) -> None:
         """Initialize all service components in order."""
-        from .database import Database
         from .auth import AuthService
+        from .database import Database
         from .scheduler import FestInScheduler, SchedulerConfig
 
         # Connect database
@@ -89,6 +88,7 @@ def create_app(festin_app: FestInApp | None = None) -> Any:
     static_dir = os.path.join(base_dir, "static")
     if os.path.isdir(static_dir):
         from fastapi.staticfiles import StaticFiles
+
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
     return app

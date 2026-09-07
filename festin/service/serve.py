@@ -83,9 +83,9 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
             if path in _exempt_paths and path != "/api/v1/auth/register":
                 return await handler(request)
             if path == "/api/v1/auth/register":
-                 # Verify the token if present so the handler can tell an
-                 # admin apart; but let anonymous requests through too —
-                 # the first-user bootstrap decides there.
+                # Verify the token if present so the handler can tell an
+                # admin apart; but let anonymous requests through too —
+                # the first-user bootstrap decides there.
                 auth_header = request.headers.get("Authorization", "")
                 if auth_header:
                     return await instance.__call__(request, handler)
@@ -153,14 +153,10 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
     if config.static_dir.exists():
 
         @web.middleware
-        async def _static_no_store(
-            request: web.Request, handler: Any
-        ) -> web.StreamResponse:
+        async def _static_no_store(request: web.Request, handler: Any) -> web.StreamResponse:
             response = await handler(request)
             if request.path.startswith("/static/"):
-                response.headers["Cache-Control"] = (
-                    "no-cache, must-revalidate"
-                )
+                response.headers["Cache-Control"] = "no-cache, must-revalidate"
             return response
 
         app.middlewares.append(_static_no_store)
@@ -180,7 +176,8 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
         await scheduler.start()
         logger.info(
             "Festin service starting on %s:%d",
-            config.host, config.port,
+            config.host,
+            config.port,
         )
 
     async def _on_shutdown(app: web.Application) -> None:
@@ -215,29 +212,6 @@ async def run_server(config: ServiceConfig | None = None) -> None:
     finally:
         await runner.cleanup()
         logger.info("Service stopped")
-
-
-async def start_background_scans(config: ServiceConfig | None = None, callback: Callable | None = None) -> Scheduler:
-    """Start the scheduler for background scans (non-blocking).
-
-    Returns the Scheduler instance; call ``scheduler.stop()`` to shut down.
-    """
-    config = config or ServiceConfig()
-    app = await create_app(config)
-
-    if callback is not None:
-        async def _wrap_callback(domains: list[str]) -> ScanResult:
-            from datetime import datetime, timezone
-            return ScanResult(
-                scan_id="bg",
-                started_at=datetime.now(timezone.utc).isoformat(),
-                finished_at=datetime.now(timezone.utc).isoformat(),
-                domains=domains,
-            )
-
-        config.scan_callback = _wrap_callback
-
-    return Scheduler()
 
 
 # -- CLI entry point --

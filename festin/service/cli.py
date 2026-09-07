@@ -1,4 +1,5 @@
 """festin.service.cli - Typer CLI launching FestIn Monitor FastAPI SPA."""
+
 from __future__ import annotations
 
 import typer
@@ -7,7 +8,7 @@ import uvicorn
 app_cli = typer.Typer(help="FestIn monitoring dashboard")
 
 
-@app_cli.command('serve')
+@app_cli.command("serve")
 def serve(
     db_path: str = "sqlite:///festin.db",
     admin_user: str = "admin",
@@ -18,8 +19,10 @@ def serve(
 ) -> None:
     """Launch the FestIn Monitor FastAPI SPA dashboard."""
     from .app import FestInApp, create_app
+
     if admin_pass is None:
         import secrets
+
         admin_pass = secrets.token_urlsafe(12)
     festin_app = FestInApp(
         db_path=db_path,

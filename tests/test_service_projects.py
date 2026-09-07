@@ -1,4 +1,5 @@
 """Tests for multi-project, scan-result persistence, and user management."""
+
 from __future__ import annotations
 
 import tempfile
@@ -89,8 +90,7 @@ class TestProjects:
         pid = await db.create_project("cascade")
         did = await db.create_domain("x.example", pid)
         sid = await db.create_scan(did)
-        await db.update_scan_status(sid, status="completed", buckets_found=1,
-                                    findings_count=2)
+        await db.update_scan_status(sid, status="completed", buckets_found=1, findings_count=2)
         assert await db.delete_project(pid) is True
         assert await db.get_domain(did) is None
         detail = await db.get_scan_detail(sid)
@@ -100,8 +100,7 @@ class TestProjects:
         pid = await db.create_project("counted")
         did = await db.create_domain("count.example", pid)
         sid = await db.create_scan(did)
-        await db.update_scan_status(sid, status="completed", buckets_found=3,
-                                    findings_count=5)
+        await db.update_scan_status(sid, status="completed", buckets_found=3, findings_count=5)
         got = await db.get_project(pid)
         assert got["domain_count"] == 1
         assert got["scan_count"] == 1
@@ -115,10 +114,14 @@ class TestPersistResults:
     async def test_persist_scan_results(self, db):
         did = await db.create_domain("p.example")
         sid = await db.create_scan(did)
-        buckets = [_Bucket("p.example", "leak-1", ["a.txt", "b.txt"]),
-                   _Bucket("p.example", "leak-2", [])]
-        findings = [_Finding("leak-1", "a.txt", "aws-keys", "critical", 12),
-                    _Finding("leak-1", "b.txt", "aws-keys", "high", 4)]
+        buckets = [
+            _Bucket("p.example", "leak-1", ["a.txt", "b.txt"]),
+            _Bucket("p.example", "leak-2", []),
+        ]
+        findings = [
+            _Finding("leak-1", "a.txt", "aws-keys", "critical", 12),
+            _Finding("leak-1", "b.txt", "aws-keys", "high", 4),
+        ]
         await db.persist_scan_results(sid, buckets, findings)
 
         detail = await db.get_scan_detail(sid)
@@ -184,8 +187,7 @@ class TestUserManagement:
     async def test_list_and_role_update(self, db):
         uid = await db.create_user("bob", "h", "viewer")
         users = await db.list_users()
-        assert any(u["username"] == "bob" and u["role"] == "viewer"
-                   for u in users)
+        assert any(u["username"] == "bob" and u["role"] == "viewer" for u in users)
 
         assert await db.set_user_role(uid, "admin") is True
         user = await db.get_user(uid)
@@ -210,8 +212,7 @@ class TestStats:
     async def test_stats_shape_with_timeline(self, db):
         did = await db.create_domain("st.example")
         sid = await db.create_scan(did)
-        await db.update_scan_status(sid, status="completed", buckets_found=1,
-                                    findings_count=1)
+        await db.update_scan_status(sid, status="completed", buckets_found=1, findings_count=1)
         await db.persist_scan_results(sid, [], [])
         stats = await db.get_stats()
         assert stats["scan_count"] == 1
@@ -219,14 +220,15 @@ class TestStats:
         assert stats["findings"]["low"] == 0
         assert isinstance(stats["recent_scans"], list)
         for row in stats["recent_scans"]:
-            assert set(row) == {"day", "scans", "buckets", "findings",
-                                "critical", "high"}
+            assert set(row) == {"day", "scans", "buckets", "findings", "critical", "high"}
 
     async def test_stats_severity_counts(self, db):
         did = await db.create_domain("sev.example")
         sid = await db.create_scan(did)
-        findings = [_Finding("b1", "o1", "r1", "critical", 1),
-                    _Finding("b1", "o2", "r2", "medium", 2)]
+        findings = [
+            _Finding("b1", "o1", "r1", "critical", 1),
+            _Finding("b1", "o2", "r2", "medium", 2),
+        ]
         await db.persist_scan_results(sid, [_Bucket("d", "b1", [])], findings)
         stats = await db.get_stats()
         assert stats["findings"]["critical"] == 1

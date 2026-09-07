@@ -1,18 +1,19 @@
 """Pydantic models shared across service, API and scheduler packages."""
+
 from __future__ import annotations
 
-from enum import Enum
-
+from enum import StrEnum
 
 # ── Enums ────────────────────────────────────────────────────────────────
 
-class DomainStatus(str, Enum):
+
+class DomainStatus(StrEnum):
     ACTIVE = "active"
     PAUSED = "paused"
     DISABLED = "disabled"
 
 
-class ScanStatus(str, Enum):
+class ScanStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -20,6 +21,7 @@ class ScanStatus(str, Enum):
 
 
 # ── Domain ───────────────────────────────────────────────────────────────
+
 
 class DomainCreate:
     domain: str
@@ -122,6 +124,7 @@ class DomainRead:
 
 # ── Scan ─────────────────────────────────────────────────────────────────
 
+
 class ScanRead:
     id: int
     domain_id: int
@@ -164,6 +167,7 @@ class ScanRead:
 
 # ── Auth ─────────────────────────────────────────────────────────────────
 
+
 class LoginRequest:
     username: str
     password: str
@@ -194,6 +198,7 @@ class UserRead:
 
 
 # ── Dashboard Aggregates ─────────────────────────────────────────────────
+
 
 class DomainStats:
     domain: str

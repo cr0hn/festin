@@ -21,9 +21,8 @@ class FestinQueue:
         """Connect to the Redis instance."""
         try:
             import coredis
-            self._redis = coredis.Redis.from_url(
-                self._url, decode_responses=True
-            )
+
+            self._redis = coredis.Redis.from_url(self._url, decode_responses=True)
             await self._redis.ping()
             self._connected = True
         except Exception:
@@ -32,20 +31,20 @@ class FestinQueue:
     async def push_scan_job(self, data: dict[str, Any]) -> str:
         """Push a scan job onto the queue. Returns a task_id."""
         task_id = str(uuid.uuid4())
-        await self._local_queue.put({
-            "task_id": task_id,
-            "data": data,
-            "created_at": time.time(),
-        })
+        await self._local_queue.put(
+            {
+                "task_id": task_id,
+                "data": data,
+                "created_at": time.time(),
+            }
+        )
         return task_id
 
     async def pop_job(self) -> dict[str, Any] | None:
         """Pop the next scan job from the queue."""
         try:
-            return await asyncio.wait_for(
-                self._local_queue.get(), timeout=0.1
-            )
-        except asyncio.TimeoutError:
+            return await asyncio.wait_for(self._local_queue.get(), timeout=0.1)
+        except TimeoutError:
             return None
 
     def is_connected(self) -> bool:
@@ -159,29 +158,29 @@ class StatusTracker:
             "started_at": time.time(),
         }
 
-    async def mark_completed(
-        self, scan_id: str, result_data: dict[str, Any]
-    ) -> None:
+    async def mark_completed(self, scan_id: str, result_data: dict[str, Any]) -> None:
         """Mark a scan as completed with result data."""
         if scan_id in self._statuses:
-            self._statuses[scan_id].update({
-                  "status": "completed",
-                  "result_data": result_data,
-                  "completed_at": time.time(),
-            })
+            self._statuses[scan_id].update(
+                {
+                    "status": "completed",
+                    "result_data": result_data,
+                    "completed_at": time.time(),
+                }
+            )
 
     async def mark_failed(self, scan_id: str, error: str) -> None:
         """Mark a scan as failed."""
         if scan_id in self._statuses:
-            self._statuses[scan_id].update({
-                  "status": "failed",
-                  "error": error,
-                  "failed_at": time.time(),
-            })
+            self._statuses[scan_id].update(
+                {
+                    "status": "failed",
+                    "error": error,
+                    "failed_at": time.time(),
+                }
+            )
 
-    async def get_status(
-        self, scan_id: str, domain_id: int | None = None
-    ) -> dict[str, Any]:
+    async def get_status(self, scan_id: str, domain_id: int | None = None) -> dict[str, Any]:
         """Get the current status of a scan."""
         status = self._statuses.get(scan_id)
         if status is not None:

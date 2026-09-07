@@ -1,8 +1,9 @@
 """FestIn service authentication: JWT tokens + bcrypt passwords."""
+
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from aiohttp import web
@@ -45,8 +46,7 @@ class PasswordHasher:
 class TokenService:
     """JWT access token creation and verification."""
 
-    def __init__(self, secret_key: str = SECRET_DEFAULT,
-                 expires_minutes: int = 60) -> None:
+    def __init__(self, secret_key: str = SECRET_DEFAULT, expires_minutes: int = 60) -> None:
         if jwt is None:
             raise ImportError("python-jose[cryptography] not installed")
         self._secret_key = secret_key
@@ -54,20 +54,17 @@ class TokenService:
         self._expires_minutes = expires_minutes
 
     def create_token(self, username: str) -> str:
-        expire = datetime.now(timezone.utc) + timedelta(
-            minutes=self._expires_minutes)
+        expire = datetime.now(UTC) + timedelta(minutes=self._expires_minutes)
         payload = {
             "sub": username,
             "exp": expire.timestamp(),
-            "iat": datetime.now(timezone.utc).timestamp(),
+            "iat": datetime.now(UTC).timestamp(),
         }
-        return jwt.encode(payload, self._secret_key,
-                            algorithm=self._algorithm)
+        return jwt.encode(payload, self._secret_key, algorithm=self._algorithm)
 
     def verify_token(self, token: str) -> str | None:
         try:
-            payload = jwt.decode(token, self._secret_key,
-                                 [self._algorithm])
+            payload = jwt.decode(token, self._secret_key, [self._algorithm])
             return payload.get("sub")
         except Exception:
             return None
@@ -76,15 +73,12 @@ class TokenService:
 class AuthService:
     """Service layer combining user management + auth."""
 
-    def __init__(self, database: Any,
-                 secret_key: str = SECRET_DEFAULT) -> None:
+    def __init__(self, database: Any, secret_key: str = SECRET_DEFAULT) -> None:
         self._db = database
         self._hasher = PasswordHasher()
-        self._token_service = TokenService(
-            secret_key=secret_key)
+        self._token_service = TokenService(secret_key=secret_key)
 
-    async def init_admin(self, username: str = "admin",
-                         password: str | None = None) -> bool:
+    async def init_admin(self, username: str = "admin", password: str | None = None) -> bool:
         if await self._db.user_exists():
             return False
         pw = password or secrets.token_urlsafe(12)
@@ -107,9 +101,7 @@ class AuthService:
             "role": user.get("role", "viewer"),
         }
 
-    async def register(
-        self, username: str, password: str, role: str = "viewer"
-    ) -> dict[str, Any]:
+    async def register(self, username: str, password: str, role: str = "viewer") -> dict[str, Any]:
         """Register a new user. Returns its public representation."""
         if not username or not password:
             raise ValueError("username and password are required")
@@ -127,15 +119,13 @@ class AuthService:
         user = await self._db.get_user_by_username(username)
         if user is None:
             return None
-        return {"user_id": user["id"], "username": username,
-                "role": user.get("role", "viewer")}
+        return {"user_id": user["id"], "username": username, "role": user.get("role", "viewer")}
 
     async def get_user(self, user_id: int) -> dict[str, Any] | None:
         row = await self._db.get_user(user_id)
         if row is None:
             return None
-        return {"id": row["id"], "username": row["username"],
-                "role": row["role"]}
+        return {"id": row["id"], "username": row["username"], "role": row["role"]}
 
 
 class AuthMiddleware:
@@ -180,7 +170,7 @@ class AuthMiddleware:
             decoded = base64.b64decode(auth_header[6:]).decode()
             username, _, password = decoded.partition(":")
         except Exception:
-            raise web.HTTPUnauthorized(headers={"WWW-Authenticate": "Basic"})
+            raise web.HTTPUnauthorized(headers={"WWW-Authenticate": "Basic"}) from None
         expected = self._users.get(username)
         if expected is None or not secrets.compare_digest(password, expected):
             raise web.HTTPUnauthorized(headers={"WWW-Authenticate": "Basic"})
@@ -204,10 +194,12 @@ class JWTMiddleware:
     # Anonymous first-user bootstrap still works because the middleware
     # passes requests without an Authorization header through to the
     # register handler, which checks user_count there.
-    DEFAULT_EXEMPT_PATHS = frozenset({
-        "/api/v1/auth/login",
-        "/api/v1/health",
-    })
+    DEFAULT_EXEMPT_PATHS = frozenset(
+        {
+            "/api/v1/auth/login",
+            "/api/v1/health",
+        }
+    )
 
     def __init__(
         self,
@@ -216,8 +208,7 @@ class JWTMiddleware:
     ) -> None:
         self._tokens = token_service or TokenService()
         self._exempt_paths = (
-            exempt_paths if exempt_paths is not None
-            else set(self.DEFAULT_EXEMPT_PATHS)
+            exempt_paths if exempt_paths is not None else set(self.DEFAULT_EXEMPT_PATHS)
         )
 
     @classmethod
@@ -230,23 +221,20 @@ class JWTMiddleware:
         return cls(TokenService(secret_key=secret), exempt_paths=exempt_paths)
 
     @web.middleware
-    async def __call__(
-        self, request: web.Request, handler: Any
-    ) -> web.StreamResponse:
+    async def __call__(self, request: web.Request, handler: Any) -> web.StreamResponse:
         if request.path in self._exempt_paths:
             return await handler(request)
 
         auth_header = request.headers.get("Authorization", "")
-        if (request.path == "/api/v1/auth/register"
-                and not auth_header.startswith("Bearer ")):
-             # First-user bootstrap: let the register handler decide.
+        if request.path == "/api/v1/auth/register" and not auth_header.startswith("Bearer "):
+            # First-user bootstrap: let the register handler decide.
             return await handler(request)
         if not auth_header.startswith("Bearer "):
             raise web.HTTPUnauthorized(
                 text='{"error": "unauthorized"}',
                 content_type="application/json",
             )
-        token = auth_header[len("Bearer "):].strip()
+        token = auth_header[len("Bearer ") :].strip()
         username = self._tokens.verify_token(token)
         if username is None:
             raise web.HTTPUnauthorized(

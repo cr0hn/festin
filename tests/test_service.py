@@ -1,16 +1,15 @@
 """Tests for festin.service package -- 85%+ coverage, complexity <=10 per function."""
+
 from __future__ import annotations
 
 import asyncio
-import os
 import tempfile
 from pathlib import Path as TmpPath
-from typing import Any
 
 import pytest
 
-
 # ===== Fixtures =====
+
 
 @pytest.fixture
 async def db_path():
@@ -18,7 +17,7 @@ async def db_path():
         path = TmpPath(tmp) / "festin_test.db"
         yield str(path)
         if path.exists():
-            await asyncio.sleep(0.1)     # allow file release
+            await asyncio.sleep(0.1)  # allow file release
 
 
 @pytest.fixture
@@ -33,6 +32,7 @@ async def database(db_path):
 
 
 # ===== database.py tests =====
+
 
 class TestDatabaseConnectDisconnect:
     async def test_connect_and_disconnect(self, database):
@@ -104,6 +104,7 @@ class TestDatabaseMigrate:
 
 # ===== auth.py tests =====
 
+
 class TestAuthHashPassword:
     async def test_hash_and_verify_roundtrip(self, database):
         from festin.service.auth import PasswordHasher
@@ -130,7 +131,7 @@ class TestAuthService:
 
         auth_svc = AuthService(database, secret_key="test-secret")
         created = await auth_svc.init_admin("admin", "admin123")
-        assert created is True     # first admin created
+        assert created is True  # first admin created
 
     async def test_init_admin_skips_if_exists(self, database):
         from festin.service.auth import AuthService
@@ -139,14 +140,16 @@ class TestAuthService:
         await database.create_user("existing", "hash")
         auth_svc = AuthService(database, secret_key="test-secret")
         created = await auth_svc.init_admin("other", "pass")
-        assert created is False      # should skip since users exist
+        assert created is False  # should skip since users exist
 
 
 # ===== Queue tests (mock Redis) =====
 
+
 class TestFestinQueue:
     async def test_push_and_pop(self):
-        from unittest.mock import AsyncMock, MagicMock
+        from unittest.mock import AsyncMock
+
         # Create a mock coredis.Redis
         mock_redis = AsyncMock()
         mock_redis.ping = AsyncMock()
@@ -176,7 +179,6 @@ class TestEventBroker:
         eb = EventBroker(redis_url="redis://localhost:6379/0")
         eb._pub_sub = mock_pubsub
 
-        queue = await eb.subscribe("scan.started")
         count = await eb.publish("scan.started", {"domain": "test.com"})
         assert isinstance(count, int)
 
@@ -200,6 +202,7 @@ class TestStatusTracker:
 
 
 # ===== Scheduler tests (mock festin.scan_runner) =====
+
 
 class TestScanOrchestrator:
     async def test_run_scan_delegates_to_runner(self, db_path):
@@ -226,7 +229,6 @@ class TestScanOrchestrator:
 
 class TestFestinScheduler:
     async def test_scheduler_start_stop(self, db_path):
-        from unittest.mock import AsyncMock
 
         from festin.service.database import Database
         from festin.service.scheduler import FestInScheduler, SchedulerConfig
@@ -247,6 +249,7 @@ class TestFestinScheduler:
 
 # ===== App.py tests =====
 
+
 class TestFestInApp:
     async def test_startup_shutdown_cycle(self, db_path):
         from festin.service.app import FestInApp
@@ -260,6 +263,7 @@ class TestFestInApp:
 class TestCreateApp:
     async def test_creates_fastapi_app(self, db_path):
         from fastapi import FastAPI
+
         from festin.service.app import FestInApp, create_app
 
         festin_app = FestInApp(db_path=db_path)
@@ -269,13 +273,13 @@ class TestCreateApp:
 
 # ===== Smoke Test (separate module) =====
 
+
 class TestServiceSmoke:
     async def test_end_to_end_flow(self, db_path):
         """Full lifecycle: startup -> add domain -> trigger scan -> overview -> shutdown."""
-        from festin.service.app import FestInApp
-        from fastapi import FastAPI
-        from festin.service.database import Database
         from unittest.mock import AsyncMock, patch
+
+        from festin.service.app import FestInApp
 
         app = FestInApp(db_path=db_path)
         await app.startup()

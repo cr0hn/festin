@@ -5,13 +5,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import asdict
-from pathlib import Path
 from typing import Any
 
 from aiohttp import web
 
-from ..models import SEVERITY_ORDER, ScanResult
+from ..models import ScanResult
 from .database import Database
 from .queues import QueueManager
 from .scheduler import Scheduler
@@ -32,12 +30,10 @@ async def _json_body(request: web.Request) -> dict[str, Any]:
             raise ValueError("Expected JSON object")
         return data
     except (ValueError, TypeError):
-        raise web.HTTPBadRequest(reason="Invalid JSON body")
+        raise web.HTTPBadRequest(reason="Invalid JSON body") from None
 
 
-def _scan_response(
-    scan_id: str, result: ScanResult | None, status: str = "done"
-) -> dict[str, Any]:
+def _scan_response(scan_id: str, result: ScanResult | None, status: str = "done") -> dict[str, Any]:
     """Build a scan response dict from a ScanResult."""
     if result is None:
         return {"scan_id": scan_id, "status": status}
@@ -54,10 +50,12 @@ def _scan_response(
 
 async def health_check(request: web.Request) -> web.Response:
     """Simple health check that responds with 200 OK."""
-    return web.json_response({
-        "status": "ok",
-        "version": "0.2.0",
-    })
+    return web.json_response(
+        {
+            "status": "ok",
+            "version": "0.2.0",
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -108,10 +106,12 @@ async def scan_start(request: web.Request) -> web.Response:
     for dom in domains:
         res = await qm.queue().push_scan_job({"domain": dom})
         results.append(res)
-    return web.json_response({
-        "scan_id": "batch-1",
-        "tasks": results,
-    })
+    return web.json_response(
+        {
+            "scan_id": "batch-1",
+            "tasks": results,
+        }
+    )
 
 
 async def scan_status(request: web.Request) -> web.Response:
@@ -243,9 +243,7 @@ class FestinRouter:
                 raise web.HTTPServiceUnavailable(reason="Auth not configured")
             body = await _json_body(request)
             try:
-                result = await self._auth.login(
-                    body.get("username", ""), body.get("password", "")
-                )
+                result = await self._auth.login(body.get("username", ""), body.get("password", ""))
             except ValueError as exc:
                 return web.json_response({"error": str(exc)}, status=401)
             return web.json_response(result)
@@ -258,28 +256,20 @@ class FestinRouter:
             password = body.get("password", "")
             first_user = await self._db.user_count() == 0
             if not first_user:
-                  # Only an authenticated admin may create further users.
+                # Only an authenticated admin may create further users.
                 if request.get("user") is None:
-                    return web.json_response(
-                        {"error": "unauthorized"}, status=401
-                    )
+                    return web.json_response({"error": "unauthorized"}, status=401)
                 current = await self._auth.verify(
-                    request.headers.get("Authorization", "").removeprefix(
-                        "Bearer "
-                    ).strip()
+                    request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
                 )
                 if current is None or current.get("role") != "admin":
-                    return web.json_response(
-                        {"error": "forbidden"}, status=403
-                    )
+                    return web.json_response({"error": "forbidden"}, status=403)
             role = "admin" if first_user else "viewer"
             try:
                 user = await self._auth.register(username, password, role)
             except ValueError as exc:
                 return web.json_response({"error": str(exc)}, status=400)
-            return web.json_response(
-                {"id": user["id"], "username": user["username"]}, status=201
-            )
+            return web.json_response({"id": user["id"], "username": user["username"]}, status=201)
 
         async def _admin_guard(request: web.Request) -> None:
             """Raise 401/403 unless the caller is an authenticated admin."""
@@ -291,9 +281,7 @@ class FestinRouter:
                     content_type="application/json",
                 )
             current = await self._auth.verify(
-                request.headers.get("Authorization", "").removeprefix(
-                    "Bearer "
-                ).strip()
+                request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
             )
             if current is None or current.get("role") != "admin":
                 raise web.HTTPForbidden(
@@ -312,9 +300,7 @@ class FestinRouter:
             if not name:
                 raise web.HTTPBadRequest(reason="Missing 'name'")
             try:
-                project_id = await self._db.create_project(
-                    name, body.get("description", "") or ""
-                )
+                project_id = await self._db.create_project(name, body.get("description", "") or "")
             except ValueError as exc:
                 return web.json_response({"error": str(exc)}, status=409)
             project = await self._db.get_project(project_id)
@@ -326,10 +312,12 @@ class FestinRouter:
             if project is None:
                 return web.json_response({"error": "not found"}, status=404)
             domains = await self._db.list_domains(project_id=project_id)
-            return web.json_response({
-                "project": project,
-                "domains": domains["domains"],
-            })
+            return web.json_response(
+                {
+                    "project": project,
+                    "domains": domains["domains"],
+                }
+            )
 
         async def _handle_patch_project(request: web.Request) -> web.Response:
             await _admin_guard(request)
@@ -348,9 +336,7 @@ class FestinRouter:
             await _admin_guard(request)
             project_id = int(request.match_info["id"])
             if project_id == 1:
-                return web.json_response(
-                    {"error": "cannot delete default project"}, status=400
-                )
+                return web.json_response({"error": "cannot delete default project"}, status=400)
             deleted = await self._db.delete_project(project_id)
             if not deleted:
                 return web.json_response({"error": "not found"}, status=404)
@@ -372,8 +358,7 @@ class FestinRouter:
                 )
             domain_id = await self._db.create_domain(domain_name, project_id)
             return web.json_response(
-                {"id": domain_id, "domain_name": domain_name,
-                 "project_id": project_id},
+                {"id": domain_id, "domain_name": domain_name, "project_id": project_id},
                 status=201,
             )
 
@@ -389,7 +374,7 @@ class FestinRouter:
             try:
                 project_id = int(project_raw) if project_raw else None
             except ValueError:
-                raise web.HTTPBadRequest(reason="Invalid 'project_id'")
+                raise web.HTTPBadRequest(reason="Invalid 'project_id'") from None
             data = await self._db.list_domains(project_id=project_id)
             return web.json_response(data)
 
@@ -425,9 +410,7 @@ class FestinRouter:
             body = await _json_body(request)
             role = body.get("role", "")
             if role not in ("admin", "viewer"):
-                return web.json_response(
-                    {"error": "invalid role"}, status=400
-                )
+                return web.json_response({"error": "invalid role"}, status=400)
             updated = await self._db.set_user_role(user_id, role)
             if not updated:
                 return web.json_response({"error": "not found"}, status=404)
@@ -440,15 +423,11 @@ class FestinRouter:
             if request.get("user") is not None:
                 target = await self._db.get_user(user_id)
                 if target is not None and target["username"] == request["user"]:
-                    return web.json_response(
-                        {"error": "cannot delete yourself"}, status=400
-                    )
+                    return web.json_response({"error": "cannot delete yourself"}, status=400)
             if await self._db.count_admins() <= 1:
                 target = await self._db.get_user(user_id)
                 if target is not None and target["role"] == "admin":
-                    return web.json_response(
-                        {"error": "cannot delete the last admin"}, status=400
-                    )
+                    return web.json_response({"error": "cannot delete the last admin"}, status=400)
             deleted = await self._db.delete_user(user_id)
             if not deleted:
                 return web.json_response({"error": "not found"}, status=404)
@@ -472,10 +451,8 @@ class FestinRouter:
                 limit_int = int(limit) if limit else 100
                 project_id = int(project_raw) if project_raw else None
             except ValueError:
-                raise web.HTTPBadRequest(reason="Invalid query parameter")
-            data = await self._db.list_scans(
-                project_id=project_id, status=status, limit=limit_int
-            )
+                raise web.HTTPBadRequest(reason="Invalid query parameter") from None
+            data = await self._db.list_scans(project_id=project_id, status=status, limit=limit_int)
             return web.json_response(data)
 
         async def _handle_delete_scan(request: web.Request) -> web.Response:
@@ -491,10 +468,8 @@ class FestinRouter:
             try:
                 limit = int(limit_raw) if limit_raw else 50
             except ValueError:
-                raise web.HTTPBadRequest(reason="Invalid 'limit'")
-            data = await self._db.list_findings(
-                severity=severity, limit=limit
-            )
+                raise web.HTTPBadRequest(reason="Invalid 'limit'") from None
+            data = await self._db.list_findings(severity=severity, limit=limit)
             return web.json_response(data)
 
         async def _handle_list_buckets(request: web.Request) -> web.Response:
@@ -502,7 +477,7 @@ class FestinRouter:
             try:
                 limit = int(limit_raw) if limit_raw else 30
             except ValueError:
-                raise web.HTTPBadRequest(reason="Invalid 'limit'")
+                raise web.HTTPBadRequest(reason="Invalid 'limit'") from None
             data = await self._db.list_buckets(limit=limit)
             return web.json_response(data)
 
@@ -533,15 +508,14 @@ class FestinRouter:
                 raise web.HTTPBadRequest(reason="Missing 'domains' list")
             project_id = body.get("project_id", 1)
             if not isinstance(project_id, int) or project_id < 1:
-                raise web.HTTPBadRequest(
-                    reason="'project_id' must be a positive integer"
-                )
+                raise web.HTTPBadRequest(reason="'project_id' must be a positive integer")
 
             async def _persist_scan(domain_name: str, pid: int) -> int:
                 """Create (or reuse) the domain row and open a scan record."""
                 existing = await self._db.find_domain(domain_name)
                 domain_id = (
-                    existing["domain_id"] if existing
+                    existing["domain_id"]
+                    if existing
                     else await self._db.create_domain(domain_name, pid)
                 )
                 return await self._db.create_scan(domain_id)
@@ -570,7 +544,8 @@ class FestinRouter:
                     logger.exception("Scan %s failed", scan_id)
                     status = "failed"
                 await self._db.update_scan_status(
-                    scan_id, status=status,
+                    scan_id,
+                    status=status,
                     buckets_found=buckets_found,
                     findings_count=findings_count,
                 )
@@ -578,9 +553,7 @@ class FestinRouter:
             if self._scan_callback is not None:
                 await self._scan_callback(domains)
                 scan_id = await _persist_scan(domains[0], project_id)
-                return web.json_response(
-                    {"scan_id": scan_id, "status": "accepted"}, status=202
-                )
+                return web.json_response({"scan_id": scan_id, "status": "accepted"}, status=202)
 
             if self._scheduler is None or not hasattr(self._scheduler, "enqueue"):
                 raise web.HTTPServiceUnavailable(reason="No scan backend configured")
@@ -608,21 +581,15 @@ class FestinRouter:
         app.router.add_get(f"{prefix}/buckets", _handle_list_buckets)
         app.router.add_get(f"{prefix}/queues/schedule", _handle_list_schedule)
         app.router.add_post(f"{prefix}/queues/schedule", _handle_create_schedule)
-        app.router.add_delete(
-            f"{prefix}/queues/schedule/{{id}}", _handle_delete_schedule
-        )
+        app.router.add_delete(f"{prefix}/queues/schedule/{{id}}", _handle_delete_schedule)
         app.router.add_post(f"{prefix}/scans/run-scan", _handle_run_scan)
         app.router.add_get(f"{prefix}/projects", _handle_list_projects)
         app.router.add_post(f"{prefix}/projects", _handle_create_project)
         app.router.add_get(f"{prefix}/projects/{{id}}", _handle_get_project)
         app.router.add_patch(f"{prefix}/projects/{{id}}", _handle_patch_project)
         app.router.add_delete(f"{prefix}/projects/{{id}}", _handle_delete_project)
-        app.router.add_post(
-            f"{prefix}/projects/{{id}}/domains", _handle_create_domain
-        )
-        app.router.add_get(
-            f"{prefix}/projects/{{id}}/domains", _handle_list_project_domains
-        )
+        app.router.add_post(f"{prefix}/projects/{{id}}/domains", _handle_create_domain)
+        app.router.add_get(f"{prefix}/projects/{{id}}/domains", _handle_list_project_domains)
         app.router.add_get(f"{prefix}/domains", _handle_list_domains)
         app.router.add_delete(f"{prefix}/domains/{{id}}", _handle_delete_domain)
         app.router.add_get(f"{prefix}/users", _handle_list_users)
