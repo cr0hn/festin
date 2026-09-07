@@ -121,6 +121,12 @@ Contribution rules, complexity gates and verification checklist:
 
 ## License
 
-Free for personal and professional use; hosted or paid services and
-commercial redistribution require a separate agreement with the author.
-See [LICENSE](LICENSE).
+Free and open for **personal and professional use** — no cost, no restrictions
+on what you use it for.
+
+If you want to build a **paid service or commercial product around FestIn**
+(SaaS, managed offering, redistribution as part of a paid platform...), that
+use case is **paid** and requires a separate agreement with the author first.
+Contact: [cr0hn@cr0hn.com](mailto:cr0hn@cr0hn.com).
+
+See [LICENSE](LICENSE) for the full terms.
