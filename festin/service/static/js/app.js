@@ -390,6 +390,13 @@
         if (link) link.textContent = registerMode ? "Back to sign in" : "Create admin account";
         if (title) title.textContent = registerMode ? "Create Admin Account" : "Sign in to Festin";
     }
+    function startSession(username) {
+        clearLoginError();
+        showDashboard(username);
+        refreshAll();
+        clearInterval(refreshInterval);
+        refreshInterval = setInterval(refreshAll, 30000);
+    }
 
     function init() {
         // Bind form handlers
