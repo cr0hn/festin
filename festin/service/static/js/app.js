@@ -334,7 +334,10 @@
         const timeline = (stats.recent_scans || []).slice().reverse();
         const scanSpark = sparkline(timeline.map((d) => d.scans), 28);
         const findSpark = sparkline(timeline.map((d) => d.findings), 28);
+        const bucketSpark = sparkline(timeline.map((d) => d.buckets), 28);
         const sevMax = Math.max(f.critical || 0, f.high || 0, f.medium || 0, f.low || 0, 1);
+        const totalBuckets = timeline.reduce((acc, d) => acc + (d.buckets || 0), 0);
+        const lastDay = timeline.length ? timeline[timeline.length - 1] : null;
 
         return (
             '<div class="count-strip">' +
@@ -342,6 +345,7 @@
             '<div class="count-item"><span class="micro">FINDINGS</span><span class="count-value">' + escNum(f.total) + "</span></div>" +
             '<div class="count-item"><span class="micro">CRITICAL</span><span class="count-value sev-critical">' + escNum(f.critical) + "</span></div>" +
             '<div class="count-item"><span class="micro">HIGH</span><span class="count-value sev-high">' + escNum(f.high) + "</span></div>" +
+            '<div class="count-item"><span class="micro">BUCKETS (14d)</span><span class="count-value">' + escNum(totalBuckets) + "</span></div>" +
             "</div>" +
 
             '<div class="home-grid">' +
@@ -353,6 +357,10 @@
             '<div class="spark spark-accent">' + findSpark + "</div>" +
             '<div class="spark-meta micro">peak ' + escNum(Math.max.apply(null, timeline.length ? timeline.map((d) => d.findings) : [0])) + "</div></div>" +
 
+            '<div class="panel"><div class="panel-label">DISCOVERY \u2014 BUCKETS / DAY</div>' +
+            '<div class="spark spark-low">' + bucketSpark + "</div>" +
+            '<div class="spark-meta micro">total ' + escNum(totalBuckets) + (lastDay ? " \u00b7 today " + escNum(lastDay.buckets) : "") + "</div></div>" +
+
             '<div class="panel"><div class="panel-label">FINDINGS BY SEVERITY</div>' +
             barRow("CRIT", f.critical || 0, sevMax, "sev-critical") +
             barRow("HIGH", f.high || 0, sevMax, "sev-high") +
@@ -360,10 +368,63 @@
             barRow("LOW", f.low || 0, sevMax, "sev-low") +
             "</div>" +
 
+            '<div class="panel"><div class="panel-label">SCAN OUTCOMES (LAST 100)</div>' +
+            '<div id="home-status">' + emptyLine("loading\u2026") + "</div></div>" +
+
+            '<div class="panel"><div class="panel-label">TOP DOMAINS \u2014 FINDINGS</div>' +
+            '<div id="home-domains">' + emptyLine("loading\u2026") + "</div></div>" +
+
             '<div class="panel"><div class="panel-label">PROJECT RANKING \u2014 FINDINGS</div>' +
             '<div id="home-projects">' + emptyLine("loading\u2026") + "</div></div>" +
             "</div>"
         );
+    }
+
+    async function loadHomeStatus() {
+        try {
+            const data = await apiFetch("/scans?limit=100");
+            const scans = data.scans || [];
+            if (!scans.length) { renderInto("home-status", emptyLine("no scans yet")); return; }
+            const order = ["completed", "failed", "running", "pending"];
+            const counts = {};
+            scans.forEach((s) => { const k = String(s.status || "pending").toLowerCase(); counts[k] = (counts[k] || 0) + 1; });
+            const total = scans.length || 1;
+            renderInto("home-status",
+                '<div class="stack-bar">' +
+                order.map((st) => {
+                    const n = counts[st] || 0;
+                    const pct = Math.round((n / total) * 100);
+                    return n ? '<span class="stack-seg tok-' + st + '" style="width:' + pct + '%" title="' + st + ': ' + n + '"></span>' : "";
+                }).join("") +
+                "</div>" +
+                '<div class="stack-legend micro">' +
+                order.map((st) => counts[st] ? '<span class="tok-' + st + '">' + st.toUpperCase() + " " + counts[st] + "</span>" : "").join(" \u00b7 ") +
+                "</div>");
+        } catch (err) {
+            renderInto("home-status", emptyLine(err.message, true));
+        }
+    }
+
+    async function loadHomeDomains() {
+        try {
+            const data = await apiFetch("/scans?limit=100");
+            const byDomain = {};
+            (data.scans || []).forEach((s) => {
+                const d = s.domain_name || "?";
+                byDomain[d] = (byDomain[d] || 0) + (s.findings_count || 0);
+            });
+            const list = Object.keys(byDomain).map((d) => ({ domain: d, n: byDomain[d] }))
+                .filter((x) => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 6);
+            if (!list.length) { renderInto("home-domains", emptyLine("no domain with findings yet")); return; }
+            const max = list[0].n || 1;
+            renderInto("home-domains", list.map((x) =>
+                '<div class="chart-row"><span class="chart-label">' + escapeHtml(x.domain) + "</span>" +
+                '<span class="chart-bar">' + "\u2588".repeat(Math.max(1, Math.round((x.n / max) * 18))) + "</span>" +
+                '<span class="num chart-value">' + escNum(x.n) + "</span></div>"
+            ).join(""));
+        } catch (err) {
+            renderInto("home-domains", emptyLine(err.message, true));
+        }
     }
 
     async function loadHomeProjects() {
@@ -399,7 +460,10 @@
         }
         view.innerHTML = renderHomeShell(stats);
         loadHomeProjects();
+        loadHomeStatus();
+        loadHomeDomains();
     }
+
 
     async function loadHomeTable() { await loadHome(); }
 

@@ -142,13 +142,28 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
     async def _index(request: web.Request) -> web.StreamResponse:
         index = config.static_dir / "index.html"
         if index.exists():
-            return web.FileResponse(index)
+            resp = web.FileResponse(index)
+            resp.headers["Cache-Control"] = "no-store, must-revalidate"
+            return resp
         return web.json_response({"error": "SPA not built"}, status=404)
 
     app.router.add_get("/", _index)
 
-    # -- Static files (SPA frontend) --
+    # -- Static files (SPA frontend); JS/CSS revalidate so deploys land --
     if config.static_dir.exists():
+
+        @web.middleware
+        async def _static_no_store(
+            request: web.Request, handler: Any
+        ) -> web.StreamResponse:
+            response = await handler(request)
+            if request.path.startswith("/static/"):
+                response.headers["Cache-Control"] = (
+                    "no-cache, must-revalidate"
+                )
+            return response
+
+        app.middlewares.append(_static_no_store)
         app.router.add_static(
             "/static",
             path=str(config.static_dir),

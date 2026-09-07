@@ -236,6 +236,7 @@ a:hover { text-decoration: underline; }
     overflow: hidden;
 }
 .spark-accent { color: var(--accent); }
+.spark-low { color: var(--info); }
 .spark-meta { margin-top: 4px; }
 
 .chart-row {
@@ -245,6 +246,22 @@ a:hover { text-decoration: underline; }
     padding: 5px 0;
     font-size: 13px;
 }
+
+/* stacked status bar (scan outcomes) */
+.stack-bar {
+    display: flex;
+    height: 18px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    overflow: hidden;
+    margin: 10px 0 8px 0;
+}
+.stack-seg { display: block; height: 100%; opacity: 0.85; }
+.stack-seg.tok-completed { background: var(--low); }
+.stack-seg.tok-failed { background: var(--critical); }
+.stack-seg.tok-running { background: var(--accent); }
+.stack-seg.tok-pending { background: var(--muted); }
+.stack-legend { display: flex; gap: 12px; flex-wrap: wrap; }
 .chart-label { min-width: 110px; letter-spacing: 0.05em; }
 .chart-label a { color: var(--ink); }
 .chart-label a:hover { color: var(--accent); }
