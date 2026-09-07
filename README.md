@@ -32,6 +32,30 @@ trend chart and a REST API — in an industrial ops-console UI.
   <a href="docs/img/dashboard-home.png"><img src="docs/img/dashboard-home.png" alt="FestIn dashboard" width="760"></a>
 </p>
 
+## See it in action
+
+**HOME — the exposure radar.** Data-generated headline, severity split, scan outcomes and rankings — the full page:
+
+![Dashboard — home](docs/img/dashboard-home.png)
+
+**SCANS** — every execution with status tokens and project/status filters:
+
+![Dashboard — scans](docs/img/dashboard-scans.png)
+
+**FINDINGS** — secrets classified by severity, with rule, bucket, object and redacted match:
+
+![Dashboard — findings](docs/img/dashboard-findings.png)
+
+**Project detail** — domains, scheduled scans and recent executions per project:
+
+![Project detail](docs/img/dashboard-project.png)
+
+**Responsive** — the same console on a phone:
+
+<p align="center">
+  <a href="docs/img/dashboard-mobile.png"><img src="docs/img/dashboard-mobile.png" alt="Dashboard on mobile" width="280"></a>
+</p>
+
 ## What's new in 0.3
 
 - **Monitoring dashboard** (`festin-serve`): multi-project (organize domains into projects), multi-user (JWT + admin/viewer roles), scheduled scans, full REST API.
