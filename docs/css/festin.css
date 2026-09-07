@@ -1,4 +1,7 @@
-/* FestIn docs theme — mirrors the dashboard ops console (warm dark + amber) */
+/* FestIn docs theme — dashboard chrome (dark) + light reading surface.
+   Navigation (header, tabs, sidebars, footer) keeps the ops-console dark.
+   The article body uses a very light warm grey for readability: prose,
+   tables, code and screenshots sit on light. */
 
 /* readability: bigger base, no hairline weights anywhere */
 html {
@@ -20,7 +23,7 @@ html {
   font-weight: 500;
 }
 
-/* headings: solid 700 — Material's default 300 reads thin on dark */
+/* headings: solid 700 — Material's default 300 reads hairline */
 .md-typeset h1,
 .md-typeset h2,
 .md-typeset h3,
@@ -38,125 +41,102 @@ html {
   --festin-ink: #e8e6df;
   --festin-muted: #8f9299;
   --festin-accent: #ffb454;
+  --festin-accent-dark: #c77b18;
   --festin-critical: #ff5c57;
   --festin-high: #ff9f43;
   --festin-medium: #ffd166;
   --festin-low: #7bd88f;
   --festin-info: #6ea8fe;
+
+  /* reading surface — very light warm grey */
+  --paper: #f5f4f0;
+  --paper-line: #d8d5cd;
+  --paper-ink: #26251f;
+  --paper-muted: #6b6a63;
+  --paper-code-bg: #ecebe5;
 }
 
-/* ---------- dark scheme (default, matches the dashboard) ---------- */
-[data-md-color-scheme="festin-dark"] {
-  --md-default-bg-color: var(--festin-bg);
-  --md-default-fg-color: var(--festin-ink);
-  --md-default-fg-color--light: var(--festin-ink);
-  --md-default-fg-color--lighter: var(--festin-muted);
-  --md-default-fg-color--faint: var(--festin-muted);
-  --md-typeset-color: var(--festin-ink);
-  --md-typeset-a-color: var(--festin-accent);
-  --md-primary-fg-color: var(--festin-panel);
-  --md-primary-bg-color: var(--festin-bg);
-  --md-accent-fg-color: var(--festin-accent);
-  --md-code-bg-color: #111214;
-  --md-code-fg-color: var(--festin-ink);
-  --md-footer-bg-color: var(--festin-panel);
-  --md-footer-fg-color: var(--festin-muted);
-  --md-admonition-bg-color: var(--festin-panel);
-}
+/* ---------- chrome: dark like the dashboard (both schemes) ---------- */
 
-/* header: page-bg tone, like the dashboard topbar */
-[data-md-color-scheme="festin-dark"] .md-header {
-  background: var(--festin-bg);
+/* header + tabs stay dark */
+.md-header {
+  background: var(--festin-bg) !important;
   border-bottom: 1px solid var(--festin-line);
   box-shadow: none;
 }
-
-/* tabs: muted grey like the dashboard nav; active/hover = amber text */
-[data-md-color-scheme="festin-dark"] .md-tabs {
-  background: var(--festin-bg);
+.md-tabs {
+  background: var(--festin-bg) !important;
   border-bottom: 1px solid var(--festin-line);
   box-shadow: none;
 }
-[data-md-color-scheme="festin-dark"] .md-tabs__link {
-  color: var(--festin-muted);
+.md-tabs__link {
+  color: var(--festin-muted) !important;
   font-size: 0.78rem;
   font-weight: 500;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-top: 0;
 }
-[data-md-color-scheme="festin-dark"] .md-tabs__link--active,
-[data-md-color-scheme="festin-dark"] .md-tabs__link:hover {
-  color: var(--festin-accent);
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  color: var(--festin-accent) !important;
 }
 
-/* sidebar: panel tone like the dashboard sidebar, 1px separator */
-[data-md-color-scheme="festin-dark"] .md-sidebar--primary {
+/* sidebars stay dark-panel */
+.md-sidebar--primary {
   background: var(--festin-panel);
   border-right: 1px solid var(--festin-line);
-  bottom: 0;
-  height: auto;
 }
-[data-md-color-scheme="festin-dark"] .md-sidebar--primary .md-sidebar__scrollwrap {
+.md-sidebar--secondary {
+  background: var(--festin-panel);
+  border-left: 1px solid var(--festin-line);
+}
+.md-sidebar--primary .md-sidebar__scrollwrap,
+.md-sidebar--secondary .md-sidebar__scrollwrap {
   border-right: none;
+  border-left: none;
 }
-/* nav links: muted grey like dashboard nav */
-[data-md-color-scheme="festin-dark"] .md-nav__link {
-  color: var(--festin-muted);
+.md-nav__link {
+  color: var(--festin-muted) !important;
   font-size: 0.78rem;
   letter-spacing: 0.02em;
   margin-top: 0.45em;
   line-height: 1.5;
 }
-[data-md-color-scheme="festin-dark"] .md-nav__link:hover {
-  color: var(--festin-ink);
+.md-nav__item--active > .md-nav__link,
+.md-nav__link:hover {
+  color: var(--festin-accent) !important;
 }
-/* active item: amber text + amber left bar, panel2 bg — dashboard nav-link.active */
-[data-md-color-scheme="festin-dark"] .md-nav__item--active > .md-nav__link {
-  color: var(--festin-accent);
+.md-nav__item--active > .md-nav__link {
   box-shadow: inset 2px 0 0 var(--festin-accent);
   background: var(--festin-panel2);
 }
-[data-md-color-scheme="festin-dark"] .md-nav__title {
-  color: var(--festin-ink);
+.md-nav__title {
+  color: var(--festin-ink) !important;
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.08em;
 }
-
-/* code blocks: darker than page, 1px line — like dashboard inputs */
-[data-md-color-scheme="festin-dark"] .md-typeset code {
-  background: var(--festin-panel2);
-  border: 1px solid var(--festin-line);
-  border-radius: 0;
-}
-[data-md-color-scheme="festin-dark"] .md-typeset pre > code {
-  border: 1px solid var(--festin-line);
-  border-radius: 0;
-  outline: 1px solid var(--festin-line);
-}
-[data-md-color-scheme="festin-dark"] .md-typeset pre {
-  border-radius: 0;
+.md-nav__icon::after {
+  color: var(--festin-muted) !important;
 }
 
-/* --- syntax highlighting: comments readable (user pain point) --- */
-[data-md-color-scheme="festin-dark"] .md-typeset .highlight .c,
-[data-md-color-scheme="festin-dark"] .md-typeset .highlight .c1,
-[data-md-color-scheme="festin-dark"] .md-typeset .highlight .cm,
-[data-md-color-scheme="festin-dark"] .md-typeset .highlight .cs,
-[data-md-color-scheme="festin-dark"] .md-typeset .highlight .ge,
-[data-md-color-scheme="festin-dark"] .md-typeset .highlight .sd {
-  color: var(--festin-muted);
-  font-style: italic;
+/* footer stays dark */
+.md-footer {
+  background: var(--festin-panel) !important;
+  border-top: 1px solid var(--festin-line);
 }
 
-/* search field = dashboard input */
-[data-md-color-scheme="festin-dark"] .md-search__input {
-  background: var(--festin-panel2);
+/* search = dashboard input (dark, inside dark header) */
+.md-search__input {
+  background: var(--festin-panel2) !important;
   border: 1px solid var(--festin-line);
 }
-[data-md-color-scheme="festin-dark"] .md-search__input + .md-search__icon {
-  color: var(--festin-muted);
+.md-search__input + .md-search__icon {
+  color: var(--festin-muted) !important;
+}
+.md-search__overlay {
+  background: rgba(20, 21, 24, 0.85) !important;
 }
 
 /* header logo sizing (hex mark) */
@@ -168,121 +148,226 @@ html {
 .md-header__button.md-logo {
   padding: 0.3rem;
 }
+.md-header__button {
+  color: var(--festin-muted) !important;
+}
+.md-header__button:hover {
+  color: var(--festin-accent) !important;
+}
 
-/* ---------- light scheme: same mono identity, paper tone ---------- */
-[data-md-color-scheme="festin-light"] {
-  --md-primary-fg-color: #f4f2ec;
-  --md-primary-bg-color: #1a1c20;
-  --md-default-bg-color: #fbfaf7;
-  --md-typeset-color: #23241f;
-  --md-typeset-a-color: #c77b18;
-  --md-accent-fg-color: #c77b18;
-  --md-code-bg-color: #f0eee7;
-  --md-footer-bg-color: #1a1c20;
+/* ---------- THE ARTICLE: light reading surface ---------- */
+
+.md-main {
+  background: var(--paper);
+}
+.md-main__inner {
+  background: transparent;
+}
+
+/* the article column itself */
+.md-content {
+  background: var(--paper);
+  border-left: 1px solid var(--festin-line);
+  box-shadow: none;
+}
+
+/* text colors on the light surface */
+.md-typeset {
+  color: var(--paper-ink);
+}
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  color: var(--paper-ink);
+}
+.md-typeset h1 {
+  font-size: 1.55em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid var(--festin-accent);
+  padding-bottom: 0.4em;
+}
+.md-typeset h2 {
+  font-size: 1.08em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--paper-muted);
+  border-bottom: 1px solid var(--paper-line);
+  padding-bottom: 0.3em;
+}
+.md-typeset h3 {
+  font-size: 0.98em;
+  color: var(--paper-ink);
+}
+
+/* links inside the article: amber readable on light */
+.md-typeset a {
+  color: var(--festin-accent-dark);
+}
+.md-typeset a:hover {
+  color: var(--festin-accent);
+}
+
+/* inline code + code blocks: light panels like dashboard inputs on paper */
+.md-typeset code {
+  background: var(--paper-code-bg);
+  border: 1px solid var(--paper-line);
+  border-radius: 0;
+  color: var(--paper-ink);
+  padding: 0.1em 0.35em;
+}
+.md-typeset pre > code {
+  background: var(--paper-code-bg) !important;
+  border: 1px solid var(--paper-line);
+  border-radius: 0;
+  color: var(--paper-ink);
+  outline: none;
+}
+.md-typeset pre {
+  background: var(--paper-code-bg);
+  border: 1px solid var(--paper-line);
+  border-radius: 0;
+}
+.md-typeset pre > code span {
+  color: inherit;
+}
+
+/* syntax highlighting tuned for the light surface */
+.md-typeset .highlight .c,
+.md-typeset .highlight .c1,
+.md-typeset .highlight .cm,
+.md-typeset .highlight .cs,
+.md-typeset .highlight .sd,
+.md-typeset .highlight .ge {
+  color: var(--paper-muted) !important;
+  font-style: italic;
+}
+.md-typeset .highlight .k,
+.md-typeset .highlight .kn,
+.md-typeset .highlight .kd {
+  color: #a14474;
+}
+.md-typeset .highlight .s,
+.md-typeset .highlight .s1,
+.md-typeset .highlight .s2,
+.md-typeset .highlight .se {
+  color: #2f7d5b;
+}
+.md-typeset .highlight .mi,
+.md-typeset .highlight .mf {
+  color: #b34a4a;
+}
+.md-typeset .highlight .o {
+  color: var(--paper-ink);
+}
+.md-typeset .highlight .nb {
+  color: #7a5c1e;
+}
+
+/* tables: dashboard-style on light */
+.md-typeset table:not([class]) {
+  font-size: 0.72rem;
+  border: 1px solid var(--paper-line);
+  background: #fdfcfa;
+}
+.md-typeset table:not([class]) th {
+  background: var(--paper-code-bg);
+  color: var(--paper-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  border-bottom: 1px solid var(--paper-line);
+}
+.md-typeset table:not([class]) td {
+  border-bottom: 1px solid var(--paper-line);
+  color: var(--paper-ink);
+}
+
+/* admonitions: flat panels with amber accent — light surface */
+.md-typeset .admonition,
+.md-typeset details {
+  background: #efede7;
+  border: 1px solid var(--paper-line);
+  border-left: 2px solid var(--festin-accent);
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 0.72rem;
+}
+.md-typeset .admonition-title,
+.md-typeset summary {
+  background: transparent;
+  border-bottom: 1px solid var(--paper-line);
+  border-radius: 0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--paper-ink);
+}
+.md-typeset .admonition-title::before {
+  background-color: var(--festin-accent-dark);
+}
+.md-typeset details[open] > summary {
+  border-bottom: 1px solid var(--paper-line);
+}
+
+/* screenshots keep their dark frame — give them a 1px border to sit on paper */
+.md-typeset img {
+  border: 1px solid var(--paper-line);
+  border-radius: 0;
+}
+
+/* mermaid renders its own colors — keep it flat */
+.md-typeset .mermaid {
+  background: #fdfdfb;
+  border: 1px solid var(--paper-line);
+  padding: 12px;
+}
+
+/* buttons: flat, bordered, uppercase */
+.md-typeset .md-button {
+  border: 1px solid var(--paper-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--paper-ink);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: none;
+}
+.md-typeset .md-button:hover {
+  border-color: var(--festin-accent-dark);
+  color: var(--festin-accent-dark);
+  background: transparent;
+}
+.md-typeset .md-button--primary {
+  color: var(--festin-accent-dark);
+  border-color: var(--festin-accent-dark);
+  background: transparent;
+}
+
+/* toc sidebar (right) links on dark panel */
+.md-sidebar--secondary .md-nav__link {
+  color: var(--festin-muted) !important;
+}
+.md-sidebar--secondary .md-nav__link:hover,
+.md-sidebar--secondary .md-nav__item--active > .md-nav__link {
+  color: var(--festin-accent) !important;
+}
+
+/* top "back to top" + scrollbars stay dashboard-toned */
+.md-top {
+  background: var(--festin-panel) !important;
+  border: 1px solid var(--festin-line);
+  color: var(--festin-ink) !important;
 }
 
 /* ---------- brand ---------- */
 .md-header__title {
   font-weight: 700;
   letter-spacing: 0.14em;
+  color: var(--festin-ink) !important;
 }
-
-/* type scale mirrors the dashboard: bold uppercase-feel titles */
-.md-typeset h1,
-.md-typeset h2,
-.md-typeset h3,
-.md-typeset h4 {
-  letter-spacing: 0.02em;
-  color: var(--md-typeset-color);
-}
-
-.md-typeset h1 {
-  font-size: 1.55em;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--festin-line);
-  padding-bottom: 0.4em;
-}
-
-/* h2 reads like a dashboard panel-label */
-.md-typeset h2 {
-  font-size: 1.05em;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--festin-muted);
-  border-bottom: 1px solid var(--festin-line);
-  padding-bottom: 0.3em;
-}
-
-.md-typeset h3 {
-  font-size: 0.95em;
-}
-
-/* tables read like the dashboard tables: 1px lines, uppercase headers */
-.md-typeset table:not([class]) {
-  font-size: 0.72rem;
-  border: 1px solid var(--festin-line);
-  background: transparent;
-}
-.md-typeset table:not([class]) th {
-  background: transparent;
-  color: var(--festin-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.68rem;
-  border-bottom: 1px solid var(--festin-line);
-}
-.md-typeset table:not([class]) td {
-  border-bottom: 1px solid var(--festin-line);
-}
-
-/* status chips used across deployment docs */
-.chip {
-  display: inline-block;
-  padding: 1px 8px;
-  font-size: 0.64rem;
-  letter-spacing: 0.06em;
-  border: 1px solid var(--festin-line);
-  border-left-width: 2px;
-  vertical-align: middle;
-}
-.chip-ok { color: var(--festin-low); border-left-color: var(--festin-low); }
-.chip-warn { color: var(--festin-high); border-left-color: var(--festin-high); }
-.chip-crit { color: var(--festin-critical); border-left-color: var(--festin-critical); }
-.chip-info { color: var(--festin-accent); border-left-color: var(--festin-accent); }
-
-/* admonitions: flat panels, 2px accent border — no rounded cards */
-[data-md-color-scheme="festin-dark"] .md-typeset .admonition,
-[data-md-color-scheme="festin-dark"] .md-typeset details {
-  background: var(--festin-panel);
-  border: 1px solid var(--festin-line);
-  border-left: 2px solid var(--festin-accent);
-  border-radius: 0;
-  box-shadow: none;
-  font-size: 0.72rem;
-}
-[data-md-color-scheme="festin-dark"] .md-typeset .admonition-title,
-[data-md-color-scheme="festin-dark"] .md-typeset summary {
-  background: transparent;
-  border-bottom: 1px solid var(--festin-line);
-  border-radius: 0;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-/* buttons match .btn: flat, bordered, uppercase */
-.md-typeset .md-button {
-  border: 1px solid var(--festin-line);
-  border-radius: 0;
-  background: transparent;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  box-shadow: none;
-}
-.md-typeset .md-button--primary {
-  color: var(--festin-accent);
-  border-color: var(--festin-accent);
-  background: transparent;
+.md-header__title .md-ellipsis {
+  color: var(--festin-ink);
 }
