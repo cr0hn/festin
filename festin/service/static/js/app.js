@@ -170,7 +170,7 @@
                 await requestLogin(username, password);
             }
             enterShell();
-            location.hash = "#/projects";
+            location.hash = "#/home";
             route();
             showFlash("signed in as " + username);
         } catch (err) {
@@ -301,6 +301,107 @@
             }).join("") +
             "</tr></thead><tbody>" + (rowsHtml || "") + "</tbody></table></div>";
     }
+
+    /* ---------- views: home ---------- */
+
+    function sparkline(values, width) {
+        /* ASCII block sparkline: ▁▂▃▄▅▆▇█ over normalized values */
+        const blocks = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588";
+        const vals = values.length ? values : [0];
+        const max = Math.max.apply(null, vals);
+        if (max === 0) return new Array(width).fill("\u2581").join("");
+        const out = [];
+        for (let i = 0; i < width; i++) {
+            const v = i < vals.length ? vals[vals.length - width + i] : 0;
+            const idx = Math.round((v / max) * (blocks.length - 1));
+            out.push(blocks[Math.max(0, idx)]);
+        }
+        return out.join("");
+    }
+
+    function barRow(label, value, max, colorCls) {
+        const width = 24;
+        const filled = max > 0 ? Math.round((value / max) * width) : 0;
+        const bar = "\u2588".repeat(filled) + "\u00b7".repeat(width - filled);
+        return '<div class="chart-row">' +
+            '<span class="chart-label ' + (colorCls || "") + '">' + escapeHtml(label) + "</span>" +
+            '<span class="chart-bar">' + bar + "</span>" +
+            '<span class="num chart-value">' + escNum(value) + "</span></div>";
+    }
+
+    function renderHomeShell(stats) {
+        const f = stats.findings || {};
+        const timeline = (stats.recent_scans || []).slice().reverse();
+        const scanSpark = sparkline(timeline.map((d) => d.scans), 28);
+        const findSpark = sparkline(timeline.map((d) => d.findings), 28);
+        const sevMax = Math.max(f.critical || 0, f.high || 0, f.medium || 0, f.low || 0, 1);
+
+        return (
+            '<div class="count-strip">' +
+            '<div class="count-item"><span class="micro">SCANS</span><span class="count-value">' + escNum(stats.scan_count) + "</span></div>" +
+            '<div class="count-item"><span class="micro">FINDINGS</span><span class="count-value">' + escNum(f.total) + "</span></div>" +
+            '<div class="count-item"><span class="micro">CRITICAL</span><span class="count-value sev-critical">' + escNum(f.critical) + "</span></div>" +
+            '<div class="count-item"><span class="micro">HIGH</span><span class="count-value sev-high">' + escNum(f.high) + "</span></div>" +
+            "</div>" +
+
+            '<div class="home-grid">' +
+            '<div class="panel"><div class="panel-label">ACTIVITY \u2014 SCANS / DAY (14d)</div>' +
+            '<div class="spark">' + scanSpark + "</div>" +
+            '<div class="spark-meta micro">' + (timeline.length ? escapeHtml(timeline[0].day) + " \u2192 " + escapeHtml(timeline[timeline.length - 1].day) : "no data yet") + "</div></div>" +
+
+            '<div class="panel"><div class="panel-label">EXPOSURE \u2014 FINDINGS / DAY</div>' +
+            '<div class="spark spark-accent">' + findSpark + "</div>" +
+            '<div class="spark-meta micro">peak ' + escNum(Math.max.apply(null, timeline.length ? timeline.map((d) => d.findings) : [0])) + "</div></div>" +
+
+            '<div class="panel"><div class="panel-label">FINDINGS BY SEVERITY</div>' +
+            barRow("CRIT", f.critical || 0, sevMax, "sev-critical") +
+            barRow("HIGH", f.high || 0, sevMax, "sev-high") +
+            barRow("MED", f.medium || 0, sevMax, "sev-medium") +
+            barRow("LOW", f.low || 0, sevMax, "sev-low") +
+            "</div>" +
+
+            '<div class="panel"><div class="panel-label">PROJECT RANKING \u2014 FINDINGS</div>' +
+            '<div id="home-projects">' + emptyLine("loading\u2026") + "</div></div>" +
+            "</div>"
+        );
+    }
+
+    async function loadHomeProjects() {
+        try {
+            const data = await apiFetch("/projects");
+            const list = (data.projects || []).filter((p) => p.findings_count > 0)
+                .sort((a, b) => b.findings_count - a.findings_count).slice(0, 5);
+            if (!list.length) { renderInto("home-projects", emptyLine("no findings across projects")); return; }
+            const max = list[0].findings_count || 1;
+            renderInto("home-projects", list.map((p) =>
+                '<div class="chart-row"><span class="chart-label"><a href="#/project/' + p.id + '">' +
+                escapeHtml(p.name) + "</a></span>" +
+                '<span class="chart-bar">' + "\u2588".repeat(Math.max(1, Math.round((p.findings_count / max) * 18))) + "</span>" +
+                '<span class="num chart-value">' + escNum(p.findings_count) + "</span></div>"
+            ).join(""));
+        } catch (err) {
+            renderInto("home-projects", emptyLine(err.message, true));
+        }
+    }
+
+    async function loadHome() {
+        setTitle("HOME");
+        setActiveNav("home");
+        const view = $("view-home");
+        view.hidden = false;
+        view.innerHTML = emptyLine("loading\u2026");
+        let stats;
+        try {
+            stats = await apiFetch("/stats");
+        } catch (err) {
+            view.innerHTML = emptyLine(err.message, true);
+            return;
+        }
+        view.innerHTML = renderHomeShell(stats);
+        loadHomeProjects();
+    }
+
+    async function loadHomeTable() { await loadHome(); }
 
     /* ---------- views: projects ---------- */
 
@@ -945,13 +1046,14 @@
     function route() {
         stopScanAuto();
         const hash = location.hash || "";
-        ["view-projects", "view-project", "view-scans", "view-scan", "view-findings", "view-users"].forEach((id) => { $(id).hidden = true; });
+        ["view-home", "view-projects", "view-project", "view-scans", "view-scan", "view-findings", "view-users"].forEach((id) => { $(id).hidden = true; });
 
         const logged = !!getToken();
         if (!logged || hash.startsWith("#/login")) { showLogin(); stopPolling(); return; }
         enterShell();
 
         let m;
+        if (hash.startsWith("#/home")) { loadHome(); return; }
         if ((m = hash.match(/^#\/project\/(\d+)$/))) { loadProjectDetail(m[1]); return; }
         if ((m = hash.match(/^#\/scan\/(\d+)$/))) { loadScanDetail(m[1]); return; }
         if (hash.startsWith("#/scans")) { loadScans(); return; }
@@ -967,6 +1069,7 @@
     function startPollingForCurrentView() {
         const hash = location.hash || "";
         const map = {
+            "#/home": loadHomeTable,
             "#/projects": loadProjectsTable,
             "#/scans": loadScanTable,
             "#/findings": loadFindingsTable,
@@ -985,7 +1088,7 @@
         window.addEventListener("hashchange", () => { route(); startPollingForCurrentView(); });
 
         if (getToken()) {
-            location.hash = location.hash || "#/projects";
+            location.hash = location.hash || "#/home";
         } else {
             location.hash = "#/login";
         }

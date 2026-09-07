@@ -201,3 +201,33 @@ class TestUserManagement:
         await db.create_user("adm2", "h", "admin")
         await db.create_user("viewer1", "h", "viewer")
         assert await db.count_admins() == 2
+
+
+# ===== Stats endpoint data =====
+
+
+class TestStats:
+    async def test_stats_shape_with_timeline(self, db):
+        did = await db.create_domain("st.example")
+        sid = await db.create_scan(did)
+        await db.update_scan_status(sid, status="completed", buckets_found=1,
+                                    findings_count=1)
+        await db.persist_scan_results(sid, [], [])
+        stats = await db.get_stats()
+        assert stats["scan_count"] == 1
+        assert stats["findings"]["medium"] == 0
+        assert stats["findings"]["low"] == 0
+        assert isinstance(stats["recent_scans"], list)
+        for row in stats["recent_scans"]:
+            assert set(row) == {"day", "scans", "buckets", "findings"}
+
+    async def test_stats_severity_counts(self, db):
+        did = await db.create_domain("sev.example")
+        sid = await db.create_scan(did)
+        findings = [_Finding("b1", "o1", "r1", "critical", 1),
+                    _Finding("b1", "o2", "r2", "medium", 2)]
+        await db.persist_scan_results(sid, [_Bucket("d", "b1", [])], findings)
+        stats = await db.get_stats()
+        assert stats["findings"]["critical"] == 1
+        assert stats["findings"]["medium"] == 1
+        assert stats["findings"]["high"] == 0

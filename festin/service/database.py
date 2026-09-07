@@ -345,31 +345,46 @@ class Database:
         return {"buckets": rows, "total": total}
 
     async def get_stats(self) -> dict[str, Any]:
-        """Dashboard stats: scan count and findings by severity."""
-        scan_cursor = await self._conn.execute("SELECT COUNT(*) FROM scans")
-        scan_count = (await scan_cursor.fetchone())[0]
+        """Dashboard stats: counts, severity split, and 14-day scan timeline."""
+        scan_count = await self._count("SELECT COUNT(*) FROM scans")
+        total_findings = await self._count("SELECT COUNT(*) FROM findings")
 
-        total_cursor = await self._conn.execute("SELECT COUNT(*) FROM findings")
-        total_findings = (await total_cursor.fetchone())[0]
-
-        crit_cursor = await self._conn.execute(
-              "SELECT COUNT(*) FROM findings WHERE severity = 'critical'"
-          )
-        critical = (await crit_cursor.fetchone())[0]
-
-        high_cursor = await self._conn.execute(
-              "SELECT COUNT(*) FROM findings WHERE severity = 'high'"
-          )
-        high = (await high_cursor.fetchone())[0]
+        sev: dict[str, int] = {}
+        for sev_name in ("critical", "high", "medium", "low"):
+            sev[sev_name] = await self._count(
+                "SELECT COUNT(*) FROM findings WHERE severity = ?", (sev_name,)
+            )
 
         return {
-              "scan_count": scan_count,
-              "findings": {
-                  "total": total_findings,
-                  "critical": critical,
-                  "high": high,
-              },
-          }
+            "scan_count": scan_count,
+            "findings": {
+                "total": total_findings,
+                "critical": sev["critical"],
+                "high": sev["high"],
+                "medium": sev["medium"],
+                "low": sev["low"],
+            },
+            "recent_scans": await self._scan_timeline(14),
+        }
+
+    async def _count(self, sql: str, params: list[Any] | None = None) -> int:
+        """Run a single COUNT query and return the integer."""
+        cursor = await self._conn.execute(sql, params or [])
+        return (await cursor.fetchone())[0]
+
+    async def _scan_timeline(self, days: int) -> list[dict[str, Any]]:
+        """Per-day scan and finding totals for the last N days (UTC)."""
+        cursor = await self._conn.execute(
+            "SELECT substr(started_at, 1, 10) AS day, COUNT(*), "
+            "COALESCE(SUM(buckets_found), 0), COALESCE(SUM(findings_count), 0) "
+            "FROM scans WHERE started_at IS NOT NULL "
+            "GROUP BY day ORDER BY day DESC LIMIT ?",
+            (days,),
+        )
+        return [
+            {"day": row[0], "scans": row[1], "buckets": row[2], "findings": row[3]}
+            for row in await cursor.fetchall()
+        ]
 
     async def add_scheduled_scan(
         self, domain: str, interval_minutes: int = 60

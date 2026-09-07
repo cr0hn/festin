@@ -211,8 +211,54 @@ a:hover { text-decoration: underline; }
     flex-wrap: wrap;
     border: 1px solid var(--line);
     background: var(--panel);
-    padding: 10px 14px;
+    padding: 12px 14px;
     margin-bottom: 16px;
+}
+
+.brand { text-decoration: none; }
+
+/* ---- home charts ---- */
+
+.home-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+.home-grid .panel { margin-bottom: 0; }
+
+.spark {
+    font-size: 20px;
+    line-height: 1.1;
+    letter-spacing: 0.08em;
+    color: var(--low);
+    padding: 12px 4px 6px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.spark-accent { color: var(--accent); }
+.spark-meta { margin-top: 4px; }
+
+.chart-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 5px 0;
+    font-size: 13px;
+}
+.chart-label { min-width: 110px; letter-spacing: 0.05em; }
+.chart-label a { color: var(--ink); }
+.chart-label a:hover { color: var(--accent); }
+.chart-bar { flex: 1; color: var(--accent); letter-spacing: 0; overflow: hidden; white-space: nowrap; }
+.chart-value { min-width: 40px; }
+.sev-critical.chart-label { color: var(--critical); }
+.sev-high.chart-label { color: var(--high); }
+.sev-medium.chart-label { color: var(--medium); }
+.sev-low.chart-label { color: var(--low); }
+.chart-row .sev-critical:not(.chart-label) { color: var(--critical); }
+
+@media (max-width: 700px) {
+    .home-grid { grid-template-columns: 1fr; }
+    .chart-label { min-width: 80px; }
 }
 
 .count-item { display: flex; flex-direction: column; gap: 2px; }

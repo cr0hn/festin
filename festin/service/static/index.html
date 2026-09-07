@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=9">
 </head>
 <body>
     <div id="flash-toast" class="flash flash-hidden" hidden></div>
@@ -37,13 +37,14 @@
     <!-- Shell -->
     <div id="shell" class="shell" hidden>
         <aside class="sidebar">
-            <div class="brand">
+            <a href="#/home" class="brand" aria-label="Home">
                 <img src="/static/favicon-32.png" alt="" class="brand-mark" width="28" height="28">
                 <div class="wordmark wordmark-sm">FESTIN</div>
-            </div>
+            </a>
             <div class="brand-sub micro">S3 EXPOSURE MONITOR</div>
             <div class="brand-sep"></div>
             <nav class="nav" aria-label="primary">
+                <a href="#/home" class="nav-link" data-nav="home">HOME</a>
                 <a href="#/projects" class="nav-link" data-nav="projects">PROJECTS</a>
                 <a href="#/scans" class="nav-link" data-nav="scans">SCANS</a>
                 <a href="#/findings" class="nav-link" data-nav="findings">FINDINGS</a>
@@ -63,7 +64,7 @@
                     <button type="button" class="btn btn-ghost" data-action="logout">LOGOUT</button>
                 </div>
             </header>
-            <main class="content">
+                <section id="view-home" class="view" hidden></section>
                 <section id="view-projects" class="view" hidden></section>
                 <section id="view-project" class="view" hidden></section>
                 <section id="view-scans" class="view" hidden></section>
@@ -74,6 +75,5 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js"></script>
-</body>
+    <script src="/static/js/app.js?v=11"></script>
 </html>
