@@ -256,3 +256,94 @@ body {
 @keyframes spin {
      to { transform: rotate(360deg); }
 }
+
+/* Auth (login view + header user area) */
+
+.app-header-inner {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.user-area {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: 0.25rem;
+}
+
+.user-name {
+    font-weight: 600;
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.login-section {
+    display: flex;
+    justify-content: center;
+    padding: 3rem 1rem;
+}
+
+.login-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    padding: 2rem;
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+}
+
+.login-card h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1.25rem;
+    color: #1a1a2e;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.login-form input {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #d2d6dc;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.login-form input:focus {
+    outline: none;
+    border-color: #3182ce;
+    box-shadow: 0 0 0 3px rgba(49,130,206,0.15);
+}
+
+.login-error {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: #c53030;
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+}
+
+.register-link {
+    display: inline-block;
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    color: #3182ce;
+    text-decoration: none;
+}
+
+.register-link:hover {
+    text-decoration: underline;
+}
+
+[hidden] {
+    display: none !important;
+}

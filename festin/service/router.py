@@ -217,14 +217,20 @@ class FestinRouter:
         queue_manager: QueueManager | None = None,
         scheduler: Scheduler | None = None,
         scan_callback: Callable[[list[str]], Awaitable[ScanResult]] | None = None,
+        auth: Any | None = None,
     ) -> None:
         self._db = database
         self._queues = queue_manager
         self._scheduler = scheduler
         self._scan_callback = scan_callback
+        self._auth = auth
 
     def add_routes(self, app: web.Application, prefix: str = "/api/v1") -> None:
         """Register all API routes on the given aiohttp application."""
+
+        # --------------------------------------------------------------
+        # Handlers
+        # --------------------------------------------------------------
 
         async def _handle_health(request: web.Request) -> web.Response:
             pending = 0
@@ -232,18 +238,181 @@ class FestinRouter:
                 pending = (await self._scheduler.stats()).get("pending", 0)
             return web.json_response({"status": "ok", "pending": pending})
 
-        async def _handle_create_scan(request: web.Request) -> web.Response:
+        async def _handle_login(request: web.Request) -> web.Response:
+            if self._auth is None:
+                raise web.HTTPServiceUnavailable(reason="Auth not configured")
+            body = await _json_body(request)
+            try:
+                result = await self._auth.login(
+                    body.get("username", ""), body.get("password", "")
+                )
+            except ValueError as exc:
+                return web.json_response({"error": str(exc)}, status=401)
+            return web.json_response(result)
+
+        async def _handle_register(request: web.Request) -> web.Response:
+            if self._auth is None:
+                raise web.HTTPServiceUnavailable(reason="Auth not configured")
+            body = await _json_body(request)
+            username = body.get("username", "")
+            password = body.get("password", "")
+            first_user = await self._db.user_count() == 0
+            if not first_user:
+                  # Only an authenticated admin may create further users.
+                if request.get("user") is None:
+                    return web.json_response(
+                        {"error": "unauthorized"}, status=401
+                    )
+                current = await self._auth.verify(
+                    request.headers.get("Authorization", "").removeprefix(
+                        "Bearer "
+                    ).strip()
+                )
+                if current is None or current.get("role") != "admin":
+                    return web.json_response(
+                        {"error": "forbidden"}, status=403
+                    )
+            role = "admin" if first_user else "viewer"
+            try:
+                user = await self._auth.register(username, password, role)
+            except ValueError as exc:
+                return web.json_response({"error": str(exc)}, status=400)
+            return web.json_response(
+                {"id": user["id"], "username": user["username"]}, status=201
+            )
+
+        async def _handle_stats(request: web.Request) -> web.Response:
+            return web.json_response(await self._db.get_stats())
+
+        async def _handle_list_scans(request: web.Request) -> web.Response:
+            limit = request.query.get("limit")
+            try:
+                limit_int = int(limit) if limit else 100
+            except ValueError:
+                raise web.HTTPBadRequest(reason="Invalid 'limit'")
+            data = await self._db.get_all_scans(limit=limit_int)
+            return web.json_response(data)
+
+        async def _handle_delete_scan(request: web.Request) -> web.Response:
+            scan_id = int(request.match_info["id"])
+            deleted = await self._db.delete_scan(scan_id)
+            if not deleted:
+                return web.json_response({"error": "not found"}, status=404)
+            return web.json_response({"deleted": scan_id})
+
+        async def _handle_list_findings(request: web.Request) -> web.Response:
+            severity = request.query.get("severity")
+            limit_raw = request.query.get("limit")
+            try:
+                limit = int(limit_raw) if limit_raw else 50
+            except ValueError:
+                raise web.HTTPBadRequest(reason="Invalid 'limit'")
+            data = await self._db.list_findings(
+                severity=severity, limit=limit
+            )
+            return web.json_response(data)
+
+        async def _handle_list_buckets(request: web.Request) -> web.Response:
+            limit_raw = request.query.get("limit")
+            try:
+                limit = int(limit_raw) if limit_raw else 30
+            except ValueError:
+                raise web.HTTPBadRequest(reason="Invalid 'limit'")
+            data = await self._db.list_buckets(limit=limit)
+            return web.json_response(data)
+
+        async def _handle_list_schedule(request: web.Request) -> web.Response:
+            schedules = await self._db.list_scheduled_scans()
+            return web.json_response({"scheduled": schedules, "total": len(schedules)})
+
+        async def _handle_create_schedule(request: web.Request) -> web.Response:
+            body = await _json_body(request)
+            domain = body.get("domain", "")
+            if not domain:
+                raise web.HTTPBadRequest(reason="Missing 'domain'")
+            interval = body.get("interval_minutes", 60)
+            entry = await self._db.add_scheduled_scan(domain, interval)
+            return web.json_response(entry, status=201)
+
+        async def _handle_delete_schedule(request: web.Request) -> web.Response:
+            schedule_id = int(request.match_info["id"])
+            removed = await self._db.remove_scheduled_scan(schedule_id)
+            if not removed:
+                return web.json_response({"error": "not found"}, status=404)
+            return web.json_response({"removed": schedule_id})
+
+        async def _handle_run_scan(request: web.Request) -> web.Response:
             body = await _json_body(request)
             domains = body.get("domains", [])
             if not domains:
                 raise web.HTTPBadRequest(reason="Missing 'domains' list")
+
+            async def _persist_scan(domain_name: str) -> int:
+                """Create (or reuse) the domain row and open a scan record."""
+                existing = await self._db.find_domain(domain_name)
+                domain_id = (
+                    existing["domain_id"] if existing
+                    else await self._db.create_domain(domain_name)
+                )
+                return await self._db.create_scan(domain_id)
+
+            async def _execute_scan(scan_id: int, domain_list: list[str]) -> None:
+                """Run festin's scan pipeline and persist the outcome."""
+                status = "completed"
+                buckets_found = findings_count = 0
+                try:
+                    from festin.scan_runner import build_namespace, run_scan
+
+                    cli_args = build_namespace(
+                        quiet=True,
+                        no_print=True,
+                        scan_id=f"svc-{scan_id}",
+                    )
+                    result_obj = await run_scan(cli_args, domain_list)
+                    buckets_found = len(getattr(result_obj, "buckets", []) or [])
+                    findings_count = len(getattr(result_obj, "findings", []) or [])
+                except Exception:
+                    logger.exception("Scan %s failed", scan_id)
+                    status = "failed"
+                await self._db.update_scan_status(
+                    scan_id, status=status,
+                    buckets_found=buckets_found,
+                    findings_count=findings_count,
+                )
+
             if self._scan_callback is not None:
                 await self._scan_callback(domains)
-            return web.json_response({"scan_id": "api-0", "status": "accepted"}, status=202)
+                scan_id = await _persist_scan(domains[0])
+                return web.json_response(
+                    {"scan_id": scan_id, "status": "accepted"}, status=202
+                )
 
-        async def _handle_list_scans(request: web.Request) -> web.Response:
-            return web.json_response({"scans": [], "total": 0})
+            if self._scheduler is None or not hasattr(self._scheduler, "enqueue"):
+                raise web.HTTPServiceUnavailable(reason="No scan backend configured")
+
+            job = await self._scheduler.enqueue(domains)
+            scan_id = await _persist_scan(domains[0])
+            asyncio.create_task(_execute_scan(scan_id, domains))
+            return web.json_response(
+                {"scan_id": scan_id, "job_id": job.get("job_id"), "status": "accepted"},
+                status=202,
+            )
+
+        # --------------------------------------------------------------
+        # Route registration
+        # --------------------------------------------------------------
 
         app.router.add_get(f"{prefix}/health", _handle_health)
-        app.router.add_post(f"{prefix}/scans", _handle_create_scan)
+        app.router.add_post(f"{prefix}/auth/login", _handle_login)
+        app.router.add_post(f"{prefix}/auth/register", _handle_register)
+        app.router.add_get(f"{prefix}/stats", _handle_stats)
         app.router.add_get(f"{prefix}/scans", _handle_list_scans)
+        app.router.add_delete(f"{prefix}/scans/{{id}}", _handle_delete_scan)
+        app.router.add_get(f"{prefix}/findings", _handle_list_findings)
+        app.router.add_get(f"{prefix}/buckets", _handle_list_buckets)
+        app.router.add_get(f"{prefix}/queues/schedule", _handle_list_schedule)
+        app.router.add_post(f"{prefix}/queues/schedule", _handle_create_schedule)
+        app.router.add_delete(
+            f"{prefix}/queues/schedule/{{id}}", _handle_delete_schedule
+        )
+        app.router.add_post(f"{prefix}/scans/run-scan", _handle_run_scan)

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any
 
 from aiohttp import web
 
@@ -44,7 +46,6 @@ class ServiceConfig:
 
 async def create_app(config: ServiceConfig | None = None) -> web.Application:
     """Create the FestIn monitoring dashboard aiohttp application."""
-    from .auth import AuthMiddleware
     from .database import Database
     from .queues import QueueManager
     from .router import FestinRouter
@@ -57,22 +58,79 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
     queue_mgr = QueueManager()
     scheduler = Scheduler()
 
-    # -- Auth middleware (optional) --
-    auth_mw: AuthMiddleware | None = None
-    if config.auth_users_file is not None and config.auth_users_file.exists():
-        auth_mw = AuthMiddleware.from_file(config.auth_users_file)
-    else:
-        auth_mw = AuthMiddleware()  # No auth by default
+    # -- Auth middleware: JWT when available (festin.service.auth), falling
+    #    back to the legacy AuthMiddleware so startup never blocks. --
+    # Paths that must be reachable without a token: the SPA itself, its
+    # static assets, and the auth bootstrap endpoints.
+    _exempt_paths = {
+        "/",
+        "/api/v1/auth/login",
+        "/api/v1/auth/register",  # first-user bootstrap; admin case in handler
+        "/api/v1/health",
+    }
+    _exempt_prefixes = ("/static",)
+
+    # Both middlewares are instances whose ``__call__`` is decorated with
+    # ``@web.middleware``. aiohttp >= 3.9 only honors the new-style contract
+    # when the marker sits on the *instance*, so wrap it in a plain
+    # new-style middleware function here.
+    def _wrap_middleware(instance: Any) -> Any:
+        @web.middleware
+        async def _mw(request: web.Request, handler: Any) -> web.StreamResponse:
+            path = request.path
+            if path in _exempt_paths or path.startswith(_exempt_prefixes):
+                return await handler(request)
+            return await instance.__call__(request, handler)
+
+        return _mw
+
+    middlewares: list[Any] = []
+    secret = os.environ.get("FESTIN_JWT_SECRET", "festin-secret-key-change-in-production")
+    try:
+        from .auth import AuthService, JWTMiddleware
+
+        auth_service = AuthService(db, secret_key=secret)
+        jwt_mw = JWTMiddleware.from_secret(secret, exempt_paths=set(_exempt_paths))
+        middlewares.append(_wrap_middleware(jwt_mw))
+        logger.info("JWT authentication middleware enabled")
+    except ImportError:
+        auth_service = None
+        from .auth import AuthMiddleware
+
+        if config.auth_users_file is not None and config.auth_users_file.exists():
+            auth_mw = AuthMiddleware.from_file(config.auth_users_file)
+        else:
+            auth_mw = AuthMiddleware()  # No auth by default
+        middlewares.append(_wrap_middleware(auth_mw))
+        logger.info("JWT middleware unavailable; using legacy AuthMiddleware")
+
+    # -- scan_callback intentionally None by default: the router's run-scan
+    #    handler persists the scan record in the DB and executes it through
+    #    the scheduler branch. A custom callback (config.scan_callback)
+    #    bypasses that path entirely. --
 
     # -- Router setup --
+    app = web.Application(middlewares=middlewares)
+    app["db"] = db
+    app["scheduler"] = scheduler
+    app["queues"] = queue_mgr
     router = FestinRouter(
         database=db,
         queue_manager=queue_mgr,
         scheduler=scheduler,
         scan_callback=config.scan_callback,
+        auth=auth_service,
     )
-    app = web.Application()
     router.add_routes(app)
+
+    # -- Root route: serve the SPA entry point --
+    async def _index(request: web.Request) -> web.StreamResponse:
+        index = config.static_dir / "index.html"
+        if index.exists():
+            return web.FileResponse(index)
+        return web.json_response({"error": "SPA not built"}, status=404)
+
+    app.router.add_get("/", _index)
 
     # -- Static files (SPA frontend) --
     if config.static_dir.exists():
@@ -85,8 +143,10 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
     else:
         logger.warning("Static directory not found at %s — SPA unavailable", config.static_dir)
 
-    # -- Startup handler (start scheduler) --
+    # -- Startup handler (connect DB, migrate schema, start scheduler) --
     async def _on_startup(app: web.Application) -> None:
+        await db.connect()
+        await db.migrate()
         await scheduler.start()
         logger.info(
             "Festin service starting on %s:%d",
@@ -95,6 +155,7 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
 
     async def _on_shutdown(app: web.Application) -> None:
         await scheduler.stop()
+        await db.disconnect()
         logger.info("Festin service shutting down")
 
     app.on_startup.append(_on_startup)

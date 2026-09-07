@@ -59,6 +59,7 @@ class QueueManager:
     def __init__(self, redis_url: str = "redis://localhost:6379/0") -> None:
         self._queue: FestinQueue | None = None
         self._redis_url = redis_url
+        self._schedules: dict[str, dict[str, Any]] = {}
 
     async def start(self) -> None:
         """Initialize the underlying queue."""
@@ -72,6 +73,27 @@ class QueueManager:
     def queue(self) -> FestinQueue | None:
         """Return the underlying FestinQueue if available."""
         return self._queue
+
+    async def add_schedule(self, domain: str, interval_minutes: int) -> dict[str, Any]:
+        """Register a recurring scan schedule for a domain (in-memory)."""
+        schedule_id = f"sched-{uuid.uuid4().hex[:12]}"
+        schedule = {
+            "id": schedule_id,
+            "domain": domain,
+            "interval_minutes": int(interval_minutes),
+            "created_at": time.time(),
+            "next_run_at": time.time() + int(interval_minutes) * 60,
+        }
+        self._schedules[schedule_id] = schedule
+        return dict(schedule)
+
+    async def list_schedules(self) -> list[dict[str, Any]]:
+        """List all registered scan schedules."""
+        return [dict(s) for s in self._schedules.values()]
+
+    async def remove_schedule(self, schedule_id: str) -> bool:
+        """Remove a scan schedule. Returns True if it existed."""
+        return self._schedules.pop(schedule_id, None) is not None
 
 
 class DomainScanner:

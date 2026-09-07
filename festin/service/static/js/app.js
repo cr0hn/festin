@@ -4,27 +4,44 @@
     "use strict";
 
     const API_BASE = "/api/v1";
+    const TOKEN_KEY = "festin_token";
     let refreshInterval;
 
      // -- Utility functions --
 
+    function getToken() {
+        return localStorage.getItem(TOKEN_KEY);
+    }
+
+    function setToken(token) {
+        if (token) {
+            localStorage.setItem(TOKEN_KEY, token);
+        } else {
+            localStorage.removeItem(TOKEN_KEY);
+        }
+    }
+
     async function apiFetch(path, options = {}) {
-         const headers = { "Accept": "application/json", ...options.headers };
-        try {
-             const resp = await fetch(API_BASE + path, { ...options, headers });
-            if (!resp.ok) {
-                let msg = "HTTP " + resp.status;
-                try {
-                     const body = await resp.json();
-                    msg = body.error || msg;
-                 } catch (_) {}
-                throw new Error(msg);
-            }
-             return resp.json();
-        } catch (err) {
-            console.warn("API Error:", path, err.message);
-            throw err;
-         }
+        const headers = { "Accept": "application/json", ...options.headers };
+        const token = getToken();
+        if (token) {
+            headers["Authorization"] = "Bearer " + token;
+        }
+        const resp = await fetch(API_BASE + path, { ...options, headers });
+        if (resp.status === 401) {
+            setToken(null);
+            showLogin();
+            throw new Error("Session expired — please sign in again");
+        }
+        if (!resp.ok) {
+            let msg = "HTTP " + resp.status;
+            try {
+                const body = await resp.json();
+                msg = body.error || msg;
+            } catch (_) {}
+            throw new Error(msg);
+        }
+        return resp.json();
     }
 
     function severityClass(sev) {
@@ -218,32 +235,176 @@
         }
     }
 
-     // -- Init --
+    // -- Auth --
+
+    function showLogin() {
+        // Stop polling while logged out (body does more than clear: resets handle)
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = undefined;
+        }
+        document.getElementById("dashboard").hidden = true;
+        document.getElementById("user-area").hidden = true;
+        document.getElementById("login-section").hidden = false;
+        document.getElementById("login-password").value = "";
+        const first = document.getElementById("login-username");
+        if (!first.value) first.focus();
+    }
+
+    function showDashboard(username) {
+        document.getElementById("login-section").hidden = true;
+        document.getElementById("dashboard").hidden = false;
+        document.getElementById("user-name").textContent = username;
+        document.getElementById("user-area").hidden = false;
+    }
+
+    function showLoginError(msg) {
+        const el = document.getElementById("login-error");
+        el.textContent = msg;
+        el.hidden = false;
+    }
+
+    function clearLoginError() {
+        const el = document.getElementById("login-error");
+        el.textContent = "";
+        el.hidden = true;
+    }
+
+    async function login(username, password) {
+        const resp = await fetch(API_BASE + "/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ username, password }),
+        });
+        if (!resp.ok) {
+            let msg = "HTTP " + resp.status;
+            try {
+                const body = await resp.json();
+                msg = body.error || msg;
+            } catch (_) {}
+            throw new Error(msg);
+        }
+        const data = await resp.json();
+        setToken(data.access_token);
+        return data;
+    }
+
+    async function register(username, password) {
+        const resp = await fetch(API_BASE + "/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ username, password }),
+        });
+        if (!resp.ok) {
+            let msg = "HTTP " + resp.status;
+            try {
+                const body = await resp.json();
+                msg = body.error || msg;
+            } catch (_) {}
+            if (resp.status === 409 || resp.status === 403) {
+                throw new Error("Registration closed");
+            }
+            throw new Error(msg);
+        }
+        return resp.json();
+    }
+
+    function usernameFromToken(token) {
+        try {
+            const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+            return payload.sub || payload.username || "";
+        } catch (_) {
+            return "";
+        }
+    }
+
+    function logout() {
+        setToken(null);
+        showLogin();
+    }
+
+    async function handleLoginSubmit(e) {
+        e.preventDefault();
+        clearLoginError();
+        const username = document.getElementById("login-username").value.trim();
+        const password = document.getElementById("login-password").value;
+        if (!username || !password) {
+            showLoginError("Username and password are required");
+            return;
+        }
+        try {
+            await login(username, password);
+            startSession(username);
+        } catch (err) {
+            showLoginError("Sign in failed: " + err.message);
+        }
+    }
+
+    async function handleRegisterSubmit(e) {
+        e.preventDefault();
+        clearLoginError();
+        const username = document.getElementById("login-username").value.trim();
+        const password = document.getElementById("login-password").value;
+        if (!username || !password) {
+            showLoginError("Username and password are required");
+            return;
+        }
+        try {
+            await register(username, password);
+            // First user registered: try to sign in immediately
+            try {
+                await login(username, password);
+                startSession(username);
+            } catch (_) {
+                showLoginError("Account created — please sign in");
+            }
+        } catch (err) {
+            showLoginError(err.message);
+        }
+    }
+
+    // -- Init --
 
     async function refreshAll() {
-         await Promise.all([
+        await Promise.all([
             renderStats(),
             renderScanList(),
             renderFindings(),
             renderBuckets(),
             renderScheduled(),
-             renderHealth(),
-         ]);
+            renderHealth(),
+        ]);
+    }
+
+    function startSession(username) {
+        clearLoginError();
+        showDashboard(username);
+        refreshAll();
+        clearInterval(refreshInterval);
+        refreshInterval = setInterval(refreshAll, 30000);
     }
 
     function init() {
-         // Bind form handlers
+        // Bind form handlers
         document.getElementById("scan-form").addEventListener("submit", handleScanSubmit);
         document.getElementById("schedule-form").addEventListener("submit", handleScheduleSubmit);
+
+        // Auth bindings
+        document.getElementById("login-form").addEventListener("submit", handleLoginSubmit);
+        document.getElementById("logout-btn").addEventListener("click", logout);
 
         // Severity filter change
         document.getElementById("severity-filter").addEventListener("change", renderFindings);
 
-         // Initial render
-         refreshAll();
-
-         // Auto-refresh every 30 seconds
-         refreshInterval = setInterval(refreshAll, 30000);
+        // Route to login or dashboard based on stored token
+        const token = getToken();
+        if (token) {
+            showDashboard(usernameFromToken(token));
+            refreshAll();
+            refreshInterval = setInterval(refreshAll, 30000);
+        } else {
+            showLogin();
+        }
     }
 
      // Boot on DOM ready

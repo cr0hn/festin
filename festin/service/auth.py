@@ -97,10 +97,23 @@ class AuthService:
         user = await self._db.get_user_by_username(username)
         if user is None:
             raise ValueError("Invalid credentials")
-        if not self._hasher.verify_password(password, user["pw_hash"]):
+        if not self._hasher.verify_password(password, user["password_hash"]):
             raise ValueError("Invalid credentials")
         token = self._token_service.create_token(username)
         return {"access_token": token, "token_type": "bearer"}
+
+    async def register(
+        self, username: str, password: str, role: str = "viewer"
+    ) -> dict[str, Any]:
+        """Register a new user. Returns its public representation."""
+        if not username or not password:
+            raise ValueError("username and password are required")
+        existing = await self._db.get_user_by_username(username)
+        if existing is not None:
+            raise ValueError(f"User '{username}' already exists")
+        pw_hash = self._hasher.hash_password(password)
+        user_id = await self._db.create_user(username, pw_hash, role)
+        return {"id": user_id, "username": username, "role": role}
 
     async def verify(self, token: str) -> dict[str, Any] | None:
         username = self._token_service.verify_token(token)
@@ -110,7 +123,7 @@ class AuthService:
         if user is None:
             return None
         return {"user_id": user["id"], "username": username,
-                "role": user.get("role", "user")}
+                "role": user.get("role", "viewer")}
 
     async def get_user(self, user_id: int) -> dict[str, Any] | None:
         row = await self._db.get_user(user_id)
@@ -166,4 +179,66 @@ class AuthMiddleware:
         expected = self._users.get(username)
         if expected is None or not secrets.compare_digest(password, expected):
             raise web.HTTPUnauthorized(headers={"WWW-Authenticate": "Basic"})
+        return await handler(request)
+
+
+class JWTMiddleware:
+    """Bearer-JWT auth middleware.
+
+    Verifies the ``Authorization: Bearer <jwt>`` header on every request
+    except those whose path is in ``exempt_paths``. On success stores the
+    authenticated username in ``request["user"]``.
+    """
+
+    # aiohttp's new-style middleware protocol: the version marker must be
+    # visible on the instance, not only on the decorated __call__ function.
+    __middleware_version__ = 1
+
+    DEFAULT_EXEMPT_PATHS = frozenset({
+        "/api/v1/auth/login",
+        "/api/v1/auth/register",
+        "/api/v1/health",
+    })
+
+    def __init__(
+        self,
+        token_service: TokenService | None = None,
+        exempt_paths: set[str] | None = None,
+    ) -> None:
+        self._tokens = token_service or TokenService()
+        self._exempt_paths = (
+            exempt_paths if exempt_paths is not None
+            else set(self.DEFAULT_EXEMPT_PATHS)
+        )
+
+    @classmethod
+    def from_secret(
+        cls,
+        secret: str,
+        exempt_paths: set[str] | None = None,
+    ) -> JWTMiddleware:
+        """Build the middleware from a shared secret."""
+        return cls(TokenService(secret_key=secret), exempt_paths=exempt_paths)
+
+    @web.middleware
+    async def __call__(
+        self, request: web.Request, handler: Any
+    ) -> web.StreamResponse:
+        if request.path in self._exempt_paths:
+            return await handler(request)
+
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise web.HTTPUnauthorized(
+                text='{"error": "unauthorized"}',
+                content_type="application/json",
+            )
+        token = auth_header[len("Bearer "):].strip()
+        username = self._tokens.verify_token(token)
+        if username is None:
+            raise web.HTTPUnauthorized(
+                text='{"error": "unauthorized"}',
+                content_type="application/json",
+            )
+        request["user"] = username
         return await handler(request)
