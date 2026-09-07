@@ -25,7 +25,7 @@ html, body {
     background: var(--bg);
     color: var(--ink);
     font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.5;
 }
 
@@ -37,21 +37,21 @@ a:hover { text-decoration: underline; }
 /* ---- type primitives ---- */
 
 .micro {
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--muted);
 }
 
 .view-title {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
     margin: 0;
     letter-spacing: 0.02em;
 }
 
 .wordmark {
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 600;
     letter-spacing: 0.28em;
     color: var(--ink);
@@ -213,28 +213,35 @@ a:hover { text-decoration: underline; }
 
 /* ---- tables ---- */
 
-.tbl-wrap { overflow-x: auto; }
-
+.tbl-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.tbl-wrap::-webkit-scrollbar { height: 6px; }
+.tbl-wrap::-webkit-scrollbar-track { background: var(--panel); }
+.tbl-wrap::-webkit-scrollbar-thumb { background: var(--line); }
+/* edge cue only when scrollable (JS-free): gradient stays inside padding box */
+@supports (scrollbar-width: thin) {
+    .tbl-wrap { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+}
 table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 th {
     text-align: left;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
+    padding: 10px 10px;
     border-bottom: 1px solid var(--line);
-    padding: 8px 10px;
     white-space: nowrap;
 }
 
 td {
-    padding: 8px 10px;
+    padding: 10px 10px;
     border-bottom: 1px solid var(--line);
     vertical-align: top;
 }
@@ -294,8 +301,8 @@ input, select {
     border: 1px solid var(--line);
     color: var(--ink);
     font-family: inherit;
-    font-size: 13px;
-    padding: 6px 8px;
+    font-size: 14px;
+    padding: 8px 10px;
     min-width: 0;
 }
 
@@ -315,14 +322,14 @@ button:focus-visible, a:focus-visible {
 
 .btn {
     font-family: inherit;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     background: transparent;
     border: 1px solid var(--line);
     color: var(--ink);
-    padding: 5px 12px;
+    padding: 7px 14px;
     cursor: pointer;
     border-radius: 0;
 }
@@ -341,7 +348,7 @@ button:focus-visible, a:focus-visible {
 
 .btn-block { display: block; width: 100%; margin-top: 10px; }
 
-.btn-sm { padding: 2px 8px; font-size: 10px; }
+.btn-sm { padding: 4px 10px; font-size: 11px; }
 
 .form-error { color: var(--critical); font-size: 12px; margin-top: 8px; }
 
@@ -373,25 +380,88 @@ button:focus-visible, a:focus-visible {
 .empty { color: var(--muted); padding: 10px 2px; }
 .empty-err { color: var(--critical); padding: 10px 2px; }
 
-.mono-note { color: var(--muted); font-size: 12px; }
+.mono-note { color: var(--muted); font-size: 13px; }
 
 /* ---- responsive ---- */
 
-@media (max-width: 800px) {
+/* Tablet: sidebar narrows */
+@media (max-width: 1000px) {
+    .sidebar { width: 170px; flex-basis: 170px; }
+    .main { margin-left: 170px; }
+    td.snippet, .snippet { max-width: 240px; }
+}
+
+/* Mobile: top bar nav, full-width controls, touch targets */
+@media (max-width: 700px) {
+    html, body { font-size: 14px; }
+
+    .shell { display: block; }
     .sidebar {
-        position: static;
+        position: sticky;
+        top: 0;
+        z-index: 20;
         width: auto;
-        flex-direction: row;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 4px;
         border-right: none;
         border-bottom: 1px solid var(--line);
     }
     .main { margin-left: 0; }
-    .brand { padding: 10px 16px; display: flex; align-items: baseline; gap: 10px; }
-    .brand-sep { display: none; }
-    .nav { flex-direction: row; padding: 0 8px 10px 8px; }
-    .sidebar-foot { margin: 0 16px 0 auto; padding: 0; }
-    .sidebar-foot .brand-sep { display: none; }
+
+    .brand {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding: 12px 14px 8px 14px;
+    }
+    .wordmark { font-size: 18px; letter-spacing: 0.22em; }
+    .wordmark-sm, .brand .micro { display: none; }
+    .brand-sep { margin: 0; }
+
+    /* horizontal scrollable nav */
+    .nav {
+        flex-direction: row;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 0 8px;
+        gap: 2px;
+    }
+    .nav-link {
+        padding: 10px 12px;
+        font-size: 13px;
+        white-space: nowrap;
+        border-left: none;
+        border-bottom: 2px solid transparent;
+    }
+    .nav-link.active { border-bottom-color: var(--accent); }
+    .sidebar-foot { display: none; }
+
+    .topbar { padding: 10px 14px; gap: 8px; flex-wrap: wrap; }
+    .content { padding: 12px 14px 24px 14px; }
+
+    /* tables: wider cells, comfortable touch rows */
+    table { font-size: 14px; }
+    th { font-size: 11px; padding: 8px 10px; }
+    td { padding: 12px 10px; }
+    tr.clickable:hover td:first-child { border-left-width: 0; padding-left: 10px; }
+    td.snippet, .snippet { max-width: 160px; }
+
+    .count-strip { gap: 18px; padding: 10px 12px; }
+    .count-item .count-value { font-size: 18px; }
+    .panel { padding: 12px; }
+
+    /* forms: full-width stacked, 44px touch targets, no iOS zoom */
+    input, select, .btn { min-height: 44px; font-size: 16px; }
+    input, select { padding: 10px 12px; }
+    .form-row { flex-direction: column; align-items: stretch; gap: 10px; }
+    .form-row input, .form-row select, .form-row .btn { flex: 1 1 auto; width: 100%; }
+    .btn { padding: 11px 16px; }
+    .btn-sm { min-height: 36px; padding: 8px 12px; font-size: 12px; }
+
+    .section-head { flex-wrap: wrap; }
+    .login-wrap { padding: 20px; }
+    .login-panel { width: 100%; max-width: 360px; }
+}
+
+@media (max-width: 380px) {
+    .user-chip { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+    td.snippet, .snippet { max-width: 110px; }
 }
