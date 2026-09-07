@@ -22,16 +22,8 @@ theme:
     - content.tabs.link
     - search.suggest
     - search.highlight
-    - toc.follow
   palette:
-    # Dark default — matches the dashboard ops console
-    - media: "(prefers-color-scheme: dark)"
-      scheme: festin-dark
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/weather-night
-        name: Switch to light
+    # dark is the default (last, unconditional); light is opt-in via toggle
     - media: "(prefers-color-scheme: light)"
       scheme: festin-light
       primary: custom
@@ -39,9 +31,12 @@ theme:
       toggle:
         icon: material/weather-sunny
         name: Switch to dark
-  font:
-    text: IBM Plex Mono
-    code: IBM Plex Mono
+    - scheme: festin-dark
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to light
 
 extra_css:
   - css/festin.css

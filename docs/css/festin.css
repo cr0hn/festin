@@ -27,65 +27,92 @@
   --md-primary-fg-color: var(--festin-panel);
   --md-primary-bg-color: var(--festin-bg);
   --md-accent-fg-color: var(--festin-accent);
-  --md-code-bg-color: var(--festin-panel);
+  --md-code-bg-color: #111214;
   --md-code-fg-color: var(--festin-ink);
   --md-footer-bg-color: var(--festin-panel);
   --md-footer-fg-color: var(--festin-muted);
   --md-admonition-bg-color: var(--festin-panel);
-  --md-shadow-z1: 0 0 0 1px var(--festin-line);
-  --md-shadow-z2: 0 0 0 1px var(--festin-line);
 }
 
-/* header = dashboard topbar: panel tone + 1px bottom line */
+/* header: page-bg tone, like the dashboard topbar */
 [data-md-color-scheme="festin-dark"] .md-header {
-  background: var(--festin-panel);
+  background: var(--festin-bg);
   border-bottom: 1px solid var(--festin-line);
   box-shadow: none;
 }
+
+/* tabs: muted grey like the dashboard nav; active/hover = amber text */
 [data-md-color-scheme="festin-dark"] .md-tabs {
-  background: var(--festin-panel);
+  background: var(--festin-bg);
   border-bottom: 1px solid var(--festin-line);
+  box-shadow: none;
 }
 [data-md-color-scheme="festin-dark"] .md-tabs__link {
   color: var(--festin-muted);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 0;
 }
 [data-md-color-scheme="festin-dark"] .md-tabs__link--active,
 [data-md-color-scheme="festin-dark"] .md-tabs__link:hover {
   color: var(--festin-accent);
 }
 
-/* sidebar = dashboard sidebar: panel tone, nav links with amber active bar */
+/* sidebar: panel tone like the dashboard sidebar, 1px separator */
 [data-md-color-scheme="festin-dark"] .md-sidebar--primary {
+  background: var(--festin-panel);
   border-right: 1px solid var(--festin-line);
+  bottom: 0;
+  height: auto;
 }
+[data-md-color-scheme="festin-dark"] .md-sidebar--primary .md-sidebar__scrollwrap {
+  border-right: none;
+}
+/* nav links: muted grey uppercase-ish like dashboard nav */
 [data-md-color-scheme="festin-dark"] .md-nav__link {
   color: var(--festin-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  margin-top: 0.35em;
 }
-[data-md-color-scheme="festin-dark"] .md-nav__item--active > .md-nav__link,
 [data-md-color-scheme="festin-dark"] .md-nav__link:hover {
   color: var(--festin-ink);
 }
+/* active item: amber text + amber left bar, panel2 bg — dashboard nav-link.active */
 [data-md-color-scheme="festin-dark"] .md-nav__item--active > .md-nav__link {
+  color: var(--festin-accent);
   box-shadow: inset 2px 0 0 var(--festin-accent);
+  background: var(--festin-panel2);
+}
+[data-md-color-scheme="festin-dark"] .md-nav__title {
+  color: var(--festin-ink);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
 }
 
+/* code blocks: darker than page, 1px line — like dashboard inputs */
 [data-md-color-scheme="festin-dark"] .md-typeset code {
   background: var(--festin-panel2);
   border: 1px solid var(--festin-line);
   border-radius: 0;
 }
-
 [data-md-color-scheme="festin-dark"] .md-typeset pre > code {
   border: 1px solid var(--festin-line);
   border-radius: 0;
+  outline: 1px solid var(--festin-line);
+}
+[data-md-color-scheme="festin-dark"] .md-typeset pre {
+  border-radius: 0;
 }
 
-/* search field matches the dashboard inputs */
+/* search field = dashboard input */
 [data-md-color-scheme="festin-dark"] .md-search__input {
-  background: var(--festin-bg);
+  background: var(--festin-panel2);
   border: 1px solid var(--festin-line);
+}
+[data-md-color-scheme="festin-dark"] .md-search__input + .md-search__icon {
+  color: var(--festin-muted);
 }
 
 /* header logo sizing (hex mark) */
@@ -113,27 +140,50 @@
   letter-spacing: 0.14em;
 }
 
+/* type scale mirrors the dashboard: bold uppercase-feel titles */
 .md-typeset h1,
 .md-typeset h2,
 .md-typeset h3,
 .md-typeset h4 {
   font-weight: 600;
   letter-spacing: 0.02em;
+  color: var(--md-typeset-color);
 }
 
 .md-typeset h1 {
-  font-size: 1.7em;
+  font-size: 1.55em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   border-bottom: 1px solid var(--festin-line);
   padding-bottom: 0.4em;
 }
 
-/* tables read like the dashboard tables */
+/* h2 reads like a dashboard panel-label */
+.md-typeset h2 {
+  font-size: 1.05em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--festin-muted);
+  border-bottom: 1px solid var(--festin-line);
+  padding-bottom: 0.3em;
+}
+
+.md-typeset h3 {
+  font-size: 0.95em;
+}
+
+/* tables read like the dashboard tables: 1px lines, uppercase headers */
 .md-typeset table:not([class]) {
   font-size: 0.72rem;
   border: 1px solid var(--festin-line);
+  background: transparent;
 }
 .md-typeset table:not([class]) th {
-  background: var(--festin-panel2);
+  background: transparent;
+  color: var(--festin-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.68rem;
   border-bottom: 1px solid var(--festin-line);
 }
 .md-typeset table:not([class]) td {
@@ -154,3 +204,39 @@
 .chip-warn { color: var(--festin-high); border-left-color: var(--festin-high); }
 .chip-crit { color: var(--festin-critical); border-left-color: var(--festin-critical); }
 .chip-info { color: var(--festin-accent); border-left-color: var(--festin-accent); }
+
+/* admonitions: flat panels, 2px accent border — no rounded cards */
+[data-md-color-scheme="festin-dark"] .md-typeset .admonition,
+[data-md-color-scheme="festin-dark"] .md-typeset details {
+  background: var(--festin-panel);
+  border: 1px solid var(--festin-line);
+  border-left: 2px solid var(--festin-accent);
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 0.72rem;
+}
+[data-md-color-scheme="festin-dark"] .md-typeset .admonition-title,
+[data-md-color-scheme="festin-dark"] .md-typeset summary {
+  background: transparent;
+  border-bottom: 1px solid var(--festin-line);
+  border-radius: 0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* buttons match .btn: flat, bordered, uppercase */
+.md-typeset .md-button {
+  border: 1px solid var(--festin-line);
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: none;
+}
+.md-typeset .md-button--primary {
+  color: var(--festin-accent);
+  border-color: var(--festin-accent);
+  background: transparent;
+}
