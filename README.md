@@ -127,6 +127,6 @@ on what you use it for.
 If you want to build a **paid service or commercial product around FestIn**
 (SaaS, managed offering, redistribution as part of a paid platform...), that
 use case is **paid** and requires a separate agreement with the author first.
-Contact: [cr0hn@cr0hn.com](mailto:cr0hn@cr0hn.com).
+Contact: [daniel@danielalfocea.com](mailto:daniel@danielalfocea.com).
 
 See [LICENSE](LICENSE) for the full terms.

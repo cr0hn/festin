@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "Free for personal and professional use; hosted or paid services and commercial redistribution require a separate agreement with the author" }
 license-files = ["LICENSE"]
-authors = [{ name = "cr0hn", email = "cr0hn@cr0hn.com" }]
+authors = [{ name = "Daniel Alfocea", email = "daniel@danielalfocea.com" }]
 
 dependencies = [
     "aiohttp>=3.14",

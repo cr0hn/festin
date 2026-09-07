@@ -1,6 +1,6 @@
 site_name: FestIn
 site_description: Credentialless discovery and monitoring of exposed S3-compatible cloud storage from domains, DNS and web crawling.
-site_author: cr0hn
+site_author: Daniel Alfocea
 site_url: ""
 repo_url: https://github.com/cr0hn/festin
 repo_name: cr0hn/festin
