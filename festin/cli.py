@@ -52,8 +52,8 @@ def _is_subcommand_token(token: str, group) -> bool:
 app = typer.Typer(
     name="festin",
     help=(
-        "Credentialless discovery and monitoring of exposed S3-compatible "
-        "cloud storage from domains, DNS and web crawling."
+        "Festin — credentialless discovery and monitoring of exposed "
+        "S3-compatible cloud storage from domains, DNS and web crawling."
     ),
     cls=_DefaultScanGroup,
     context_settings={"help_option_names": ["-h", "--help"]},
