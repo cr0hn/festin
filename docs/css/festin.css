@@ -82,35 +82,63 @@ html {
   color: var(--festin-accent) !important;
 }
 
-/* sidebars: same paper tone as the article, separated by 1px lines */
-.md-sidebar--primary,
-.md-sidebar--secondary {
-  background: var(--paper);
-  position: sticky;
-  top: 0;
-  bottom: 0;
-  height: 100vh;
-  width: 12.1rem;
-  padding: 0;
-  margin: 0;
+/* sidebars: paper tone, desktop only. On mobile Material turns
+   --primary into a slide-out drawer — never force sticky/height there. */
+@media screen and (min-width: 76.25em) {
+  .md-sidebar--primary,
+  .md-sidebar--secondary {
+    background: var(--paper);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    padding: 0;
+    margin: 0;
+  }
+  .md-sidebar--primary {
+    border-right: 1px solid var(--paper-line);
+  }
+  .md-sidebar--secondary {
+    border-left: 1px solid var(--paper-line);
+  }
+  .md-sidebar .md-sidebar__scrollwrap {
+    background: var(--paper);
+    margin: 0;
+    padding: 20px 0 20px 14px;
+  }
+  .md-sidebar--secondary .md-sidebar__scrollwrap {
+    padding: 20px 0 20px 16px;
+  }
 }
-.md-sidebar--primary {
-  border-right: 1px solid var(--paper-line);
+/* mobile drawer: paper surface, dark text — matches the reading area */
+/* mobile drawer: source-repo badge dark like the header, not blue */
+.md-source {
+  background: var(--festin-bg) !important;
+  border-radius: 0;
 }
-.md-sidebar--secondary {
-  border-left: 1px solid var(--paper-line);
+.md-source:hover {
+  background-color: var(--festin-panel2) !important;
 }
-.md-sidebar--primary .md-sidebar__scrollwrap {
-  background: var(--paper);
-  height: 100vh;
-  margin: 0;
-  padding: 20px 0 20px 14px;
+.md-source__repository {
+  color: var(--festin-ink) !important;
 }
-.md-sidebar--secondary .md-sidebar__scrollwrap {
-  background: var(--paper);
-  height: 100vh;
-  margin: 0;
-  padding: 20px 0 20px 16px;
+.md-source__facts {
+  color: var(--festin-muted) !important;
+}
+.md-source__icon {
+  color: var(--festin-ink) !important;
+}
+
+@media screen and (max-width: 76.1875em) {
+  .md-sidebar--primary {
+    background: var(--paper);
+  }
+  .md-sidebar--primary .md-sidebar__scrollwrap {
+    background: var(--paper);
+    margin: 0;
+  }
+  .md-sidebar--primary .md-nav__title {
+    color: var(--paper-ink) !important;
+  }
 }
 .md-sidebar .md-nav__link {
   color: var(--paper-muted) !important;
