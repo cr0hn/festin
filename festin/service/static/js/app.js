@@ -390,6 +390,18 @@
         if (link) link.textContent = registerMode ? "Back to sign in" : "Create admin account";
         if (title) title.textContent = registerMode ? "Create Admin Account" : "Sign in to Festin";
     }
+
+    async function refreshAll() {
+        await Promise.all([
+            renderStats(),
+            renderScanList(),
+            renderFindings(),
+            renderBuckets(),
+            renderScheduled(),
+            renderHealth(),
+        ]);
+    }
+
     function startSession(username) {
         clearLoginError();
         showDashboard(username);
