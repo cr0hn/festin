@@ -217,7 +217,58 @@ a:hover { text-decoration: underline; }
 
 .brand { text-decoration: none; }
 
-/* ---- home charts ---- */
+
+/* ---- hero card (exposure trend) ---- */
+
+.hero-card { grid-column: 1 / -1; margin-bottom: 16px; }
+.hero-headline {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+}
+.hero-sub { color: var(--muted); font-size: 13px; margin: 4px 0 18px 0; }
+.hero-chart { border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0 0 0 8px; }
+.hero-chart table { border-collapse: collapse; }
+.hero-chart td { border-bottom: none; padding: 3px 0; vertical-align: bottom; }
+.axis-day {
+    font-size: 11px;
+    color: var(--muted);
+    padding-right: 10px !important;
+    white-space: nowrap;
+    text-align: right;
+    width: 52px;
+}
+.axis-cells { white-space: nowrap; }
+.hbar {
+    display: inline-block;
+    width: 14px;
+    margin-right: 2px;
+    vertical-align: bottom;
+    min-height: 1px;
+}
+.hbar-scans { background: var(--line); }
+.hbar-finds { background: var(--accent); }
+.hbar-crit { background: var(--critical); }
+.hero-foot {
+    display: flex;
+    gap: 18px;
+    align-items: baseline;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--muted);
+    flex-wrap: wrap;
+}
+.legend-scan { color: var(--line); }
+.legend-find { color: var(--accent); }
+.legend-crit { color: var(--critical); }
+.hero-foot-right { margin-left: auto; color: var(--muted); }
+
+@media (max-width: 700px) {
+    .hero-foot-right { margin-left: 0; }
+    .axis-day { width: 40px; }
+    .hbar { width: 9px; }
+}
 
 .home-grid {
     display: grid;

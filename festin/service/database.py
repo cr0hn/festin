@@ -373,18 +373,36 @@ class Database:
         return (await cursor.fetchone())[0]
 
     async def _scan_timeline(self, days: int) -> list[dict[str, Any]]:
-        """Per-day scan and finding totals for the last N days (UTC)."""
-        cursor = await self._conn.execute(
+        """Per-day scans/buckets plus critical/high findings (UTC).
+
+        Two queries on purpose: joining findings into the scans aggregate
+        would double-count per-scan counters (buckets_found, findings_count)."""
+        scan_cursor = await self._conn.execute(
             "SELECT substr(started_at, 1, 10) AS day, COUNT(*), "
             "COALESCE(SUM(buckets_found), 0), COALESCE(SUM(findings_count), 0) "
             "FROM scans WHERE started_at IS NOT NULL "
             "GROUP BY day ORDER BY day DESC LIMIT ?",
             (days,),
         )
-        return [
-            {"day": row[0], "scans": row[1], "buckets": row[2], "findings": row[3]}
-            for row in await cursor.fetchall()
-        ]
+        timeline = {
+            row[0]: {"day": row[0], "scans": row[1], "buckets": row[2],
+                     "findings": row[3], "critical": 0, "high": 0}
+            for row in await scan_cursor.fetchall()
+        }
+        sev_cursor = await self._conn.execute(
+            "SELECT substr(s.started_at, 1, 10) AS day, "
+            "COALESCE(SUM(f.severity = 'critical'), 0), "
+            "COALESCE(SUM(f.severity = 'high'), 0) "
+            "FROM findings f JOIN scans s ON s.id = f.scan_id "
+            "WHERE s.started_at IS NOT NULL "
+            "GROUP BY day"
+        )
+        for day, crit, high in await sev_cursor.fetchall():
+            if day in timeline:
+                timeline[day]["critical"] = crit
+                timeline[day]["high"] = high
+        ordered = sorted(timeline.values(), key=lambda d: d["day"], reverse=True)
+        return ordered[:days]
 
     async def add_scheduled_scan(
         self, domain: str, interval_minutes: int = 60

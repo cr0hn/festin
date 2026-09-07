@@ -329,6 +329,75 @@
             '<span class="num chart-value">' + escNum(value) + "</span></div>";
     }
 
+    function exposureHeadline(timeline) {
+        /* Single-metric story: trend of total findings/day across the window. */
+        const days = timeline.filter((d) => d.findings > 0 || d.scans > 0);
+        if (timeline.length < 2) {
+            return { title: "NOT ENOUGH HISTORY YET", sub: "run more scans to build the 14-day trend", foot: "" };
+        }
+        const first = timeline[0], last = timeline[timeline.length - 1];
+        const peak = timeline.reduce((a, b) => (b.findings > a.findings ? b : a), timeline[0]);
+        const total = timeline.reduce((acc, d) => acc + d.findings, 0);
+        const critTotal = timeline.reduce((acc, d) => acc + (d.critical || 0), 0);
+        const hiTotal = timeline.reduce((acc, d) => acc + (d.high || 0), 0);
+
+        let title, sub;
+        if (total === 0) {
+            title = "NO FINDINGS IN THE LAST 14 DAYS";
+            sub = "every scan came back clean across all projects";
+        } else if (last.findings < first.findings && first.findings > 0) {
+            const drop = Math.round(((first.findings - last.findings) / first.findings) * 100);
+            title = "EXPOSURE TRENDING DOWN " + drop + "% SINCE " + escapeHtml(first.day.slice(5));
+            sub = "findings fell from " + first.findings + " to " + last.findings + " per scan-day";
+        } else if (last.findings > first.findings) {
+            const rise = Math.round(((last.findings - first.findings) / Math.max(1, first.findings)) * 100);
+            title = "EXPOSURE TRENDING UP " + rise + "% SINCE " + escapeHtml(first.day.slice(5));
+            sub = "findings grew from " + first.findings + " to " + last.findings + " per scan-day";
+        } else {
+            title = "EXPOSURE FLAT OVER 14 DAYS";
+            sub = total + " findings across " + timeline.length + " active scan-days";
+        }
+        const foot = critTotal || hiTotal
+            ? "of " + total + " findings, " + critTotal + " critical and " + hiTotal + " high \u2014 peak day " + escapeHtml(peak.day)
+            : "no critical or high findings in the window";
+        return { title: title, sub: sub, foot: foot };
+    }
+
+    function renderExposureHero(timeline) {
+        const w = timeline.length ? 14 : 0;
+        if (!w) {
+            return '<div class="panel hero-card"><div class="panel-label">EXPOSURE TREND \u2014 14 DAYS</div>' +
+                emptyLine("no scan data yet \u2014 run a scan to build the trend") + "</div>";
+        }
+        const head = exposureHeadline(timeline);
+        const maxVal = Math.max(1, Math.max.apply(null, timeline.map((d) => Math.max(d.findings, d.scans))));
+        const rows = timeline.map((d) => {
+            const scansH = Math.round((d.scans / maxVal) * 40);
+            const findsH = Math.round((d.findings / maxVal) * 40);
+            const critH = Math.round(((d.critical || 0) / maxVal) * 40);
+            const highH = Math.round(((d.high || 0) / maxVal) * 40);
+            return "<tr>" +
+                '<td class="axis-day">' + escapeHtml(d.day.slice(5)) + "</td>" +
+                '<td class="axis-cells">' +
+                    '<span class="hbar hbar-scans" style="height:' + scansH + 'px" title="scans: ' + d.scans + '"></span>' +
+                    '<span class="hbar hbar-finds" style="height:' + findsH + 'px" title="findings: ' + d.findings + '"></span>' +
+                    '<span class="hbar hbar-crit" style="height:' + critH + 'px" title="critical: ' + (d.critical || 0) + '"></span>' +
+                "</td></tr>";
+        }).join("");
+        return (
+            '<div class="panel hero-card">' +
+            '<div class="hero-headline">' + head.title + "</div>" +
+            '<div class="hero-sub">' + head.sub + "</div>" +
+            '<div class="hero-chart">' +
+            "<table><tbody>" + rows + "</tbody></table>" +
+            "</div>" +
+            '<div class="hero-foot"><span class="legend-scan">\u25a0</span> scans' +
+            '<span class="legend-find">\u25a0</span> findings' +
+            '<span class="legend-crit">\u25a0</span> critical (stacked)' +
+            '<span class="hero-foot-right">' + head.foot + "</span></div>" +
+            "</div>"
+        );
+    }
     function renderHomeShell(stats) {
         const f = stats.findings || {};
         const timeline = (stats.recent_scans || []).slice().reverse();
@@ -348,6 +417,7 @@
             '<div class="count-item"><span class="micro">BUCKETS (14d)</span><span class="count-value">' + escNum(totalBuckets) + "</span></div>" +
             "</div>" +
 
+            renderExposureHero(timeline) +
             '<div class="home-grid">' +
             '<div class="panel"><div class="panel-label">ACTIVITY \u2014 SCANS / DAY (14d)</div>' +
             '<div class="spark">' + scanSpark + "</div>" +
