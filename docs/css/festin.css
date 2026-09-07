@@ -82,10 +82,10 @@ html {
   color: var(--festin-accent) !important;
 }
 
-/* sidebars: full-height dark panels like the dashboard sidebar */
+/* sidebars: same paper tone as the article, separated by 1px lines */
 .md-sidebar--primary,
 .md-sidebar--secondary {
-  background: var(--festin-panel);
+  background: var(--paper);
   position: sticky;
   top: 0;
   bottom: 0;
@@ -95,14 +95,13 @@ html {
   margin: 0;
 }
 .md-sidebar--primary {
-  border-right: 1px solid var(--festin-line);
+  border-right: 1px solid var(--paper-line);
 }
 .md-sidebar--secondary {
-  border-left: 1px solid var(--festin-line);
+  border-left: 1px solid var(--paper-line);
 }
-/* the sticky scrollwrap must also be dark and full height */
 .md-sidebar .md-sidebar__scrollwrap {
-  background: var(--festin-panel);
+  background: var(--paper);
   height: 100vh;
   margin: 0;
   padding-top: 1.2rem;
@@ -112,8 +111,9 @@ html {
   border-right: none;
   border-left: none;
 }
+/* nav links: soft grey on paper; active = amber text + amber bar */
 .md-nav__link {
-  color: var(--festin-muted) !important;
+  color: var(--paper-muted) !important;
   font-size: 0.78rem;
   letter-spacing: 0.02em;
   margin-top: 0.45em;
@@ -122,14 +122,14 @@ html {
 }
 .md-nav__item--active > .md-nav__link,
 .md-nav__link:hover {
-  color: var(--festin-accent) !important;
+  color: var(--festin-accent-dark) !important;
 }
 .md-nav__item--active > .md-nav__link {
   background: transparent !important;
-  box-shadow: inset 2px 0 0 var(--festin-accent) !important;
+  box-shadow: inset 2px 0 0 var(--festin-accent-dark) !important;
 }
 .md-nav__title {
-  color: var(--festin-ink) !important;
+  color: var(--paper-ink) !important;
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -139,11 +139,11 @@ html {
 /* TOC ("Table of contents") title bar in the secondary sidebar */
 .md-sidebar--secondary .md-nav__title {
   background: transparent !important;
-  color: var(--festin-muted) !important;
+  color: var(--paper-muted) !important;
   font-size: 0.7rem;
 }
 .md-nav__icon::after {
-  color: var(--festin-muted) !important;
+  color: var(--paper-muted) !important;
 }
 
 /* footer stays dark */
@@ -371,13 +371,13 @@ html {
   background: transparent;
 }
 
-/* toc sidebar (right) links on dark panel */
+/* toc sidebar (right) links — same paper treatment */
 .md-sidebar--secondary .md-nav__link {
-  color: var(--festin-muted) !important;
+  color: var(--paper-muted) !important;
 }
 .md-sidebar--secondary .md-nav__link:hover,
 .md-sidebar--secondary .md-nav__item--active > .md-nav__link {
-  color: var(--festin-accent) !important;
+  color: var(--festin-accent-dark) !important;
 }
 
 /* top "back to top" + scrollbars stay dashboard-toned */
