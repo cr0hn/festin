@@ -233,10 +233,14 @@ timeout 130 uv run pytest --timeout=30 -q     # debe decir: 289 passed
 # 2. Sintaxis JS (insuficiente solo, ver punto 9)
 node --check festin/service/static/js/app.js
 
-# 3. Funciones JS referenciadas = definidas
+# 3. Funciones JS propias referenciadas = definidas (regla del punto 9).
+#    Filtra globals del navegador; los nombres que queden son funciones
+#    propias del archivo que DEBEN tener `function <name>`.
 node -e "const s=require('fs').readFileSync('festin/service/static/js/app.js','utf8');
-for (const f of [...s.matchAll(/(\w+)\(/g)].map(m=>m[1]))
-  console.log(f, /function\s+\w*\s*\(?\s*['\"]?\s*$/m.test('') ? '' : '')" # o grep manual
+const SKIP=new Set(['function','if','for','while','catch','return','typeof','new','fetch','Error','clearTimeout','setTimeout','Date','confirm','encodeURIComponent','URLSearchParams','String','parseInt','clearInterval','setInterval','atob','alert','Promise','JSON','document','window','localStorage','console','RegExp','Set','Math']);
+const called=[...s.matchAll(/(?<![.\w])(\w+)\s*\(/g)].map(m=>m[1]).filter(f=>!SKIP.has(f));
+const missing=[...new Set(called)].filter(f=>!new RegExp('function\\\\s+'+f+'\\\\b').test(s));
+console.log(missing.length? 'MISSING: '+missing.join(', ') : 'all defined');"
 
 # 4. Arrancar el servicio y smoke-test
 uv run python -m festin.service.serve &
