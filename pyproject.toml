@@ -21,7 +21,7 @@ dependencies = [
     "passlib[bcrypt]>=1.7",
     "pydantic>=2.0",
     "python-jose[cryptography]>=3.3",
-    "redis>=5.0",
+    "streaq>=7.2",
     "typer>=0.12",
     "uvicorn[standard]>=0.30",
     "watchfiles>=1.1",
@@ -38,6 +38,12 @@ Homepage = "https://github.com/cr0hn/festin"
 [project.scripts]
 festin = "festin.cli:main"
 festin-serve = "festin.service.cli:main"
+festin-worker = "festin.service.serve:run_worker"
+
+[project.optional-dependencies]
+queue = [
+    "streaq>=7.2",
+]
 
 [dependency-groups]
 dev = [
@@ -74,6 +80,7 @@ build-backend = "hatchling.build"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 timeout = 60
+markers = ["integration: tests requiring external services (PostgreSQL, Redis)"]
 
 [tool.ruff]
 line-length = 100

@@ -11,6 +11,7 @@ from collections import deque
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
+
 from aiohttp import web
 
 from ..models import ScanResult
@@ -31,6 +32,7 @@ class ServiceConfig:
         host: str = "127.0.0.1",
         port: int = 8420,
         db_path: Path | None = None,
+        db_dsn: str | None = None,
         static_dir: Path | None = None,
         state_file: Path | None = None,
         auth_users_file: Path | None = None,
@@ -41,6 +43,8 @@ class ServiceConfig:
         self.host = host
         self.port = port
         self.db_path = db_path or Path("data", "festin.db")
+        # Full DSN (e.g. postgres://...) overrides db_path when set.
+        self.db_dsn = db_dsn or os.environ.get("FESTIN_DB_DSN")
         self.static_dir = static_dir or (Path(__file__).resolve().parent / "static")
         self.state_file = state_file
         self.auth_users_file = auth_users_file
@@ -135,15 +139,20 @@ def _rate_limit_middleware(limiter: SlidingWindowLimiter) -> Any:
 async def create_app(config: ServiceConfig | None = None) -> web.Application:
     """Create the FestIn monitoring dashboard aiohttp application."""
     from .database import Database
-    from .queues import QueueManager
+    from .queues import QueueManager, get_queue_mode, get_redis_url
     from .router import FestinRouter
     from .scheduler import Scheduler
 
     config = config or ServiceConfig()
     # Ensure DB directory exists
     config.db_path.parent.mkdir(parents=True, exist_ok=True)
-    db = Database(config.db_path)
-    queue_mgr = QueueManager()
+    db = Database(config.db_dsn or config.db_path)
+    queue_mode = get_queue_mode()
+    queue_redis_url = get_redis_url()
+    queue_mgr = QueueManager(
+        redis_url=queue_redis_url,
+        mode=queue_mode,
+    )
     scheduler = Scheduler(database=db)
 
     # -- Auth middleware: JWT when available (festin.service.auth), falling
@@ -183,6 +192,14 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
         return _mw
 
     middlewares: list[Any] = []
+    # -- Rate limiting for auth endpoints. Registered BEFORE the JWT
+    #    middleware: middleware order follows list order, so the limiter
+    #    sees the request first (order matters: rate limit first). --
+    limiter = SlidingWindowLimiter(
+        max_attempts=config.rate_limit_attempts,
+        window_seconds=config.rate_limit_window,
+    )
+    middlewares.append(_rate_limit_middleware(limiter))
     secret = os.environ.get("FESTIN_JWT_SECRET", "festin-secret-key-change-in-production")
     try:
         from .auth import AuthService, JWTMiddleware
@@ -305,6 +322,34 @@ async def run_server(config: ServiceConfig | None = None) -> None:
 # -- CLI entry point --
 
 
+def _env_rate_limits() -> tuple[int, int]:
+    """Read FESTIN_RATE_LIMIT_ATTEMPTS / FESTIN_RATE_LIMIT_WINDOW."""
+    attempts = int(os.environ.get("FESTIN_RATE_LIMIT_ATTEMPTS", "5"))
+    window = int(os.environ.get("FESTIN_RATE_LIMIT_WINDOW", "60"))
+    return attempts, window
+
+
+def run_worker() -> None:
+    """Entry point for the ``festin-worker`` console script.
+
+    Runs the streaQ worker that consumes scan jobs enqueued by the web
+    service (FESTIN_QUEUE=streaq). Configuration comes from the same
+    environment variables: FESTIN_REDIS_URL and FESTIN_DB_DSN/--db.
+    """
+    import argparse
+
+    from .queues import run_streaq_worker
+
+    parser = argparse.ArgumentParser(description="Festin scan worker (streaQ)")
+    parser.add_argument(
+        "--db",
+        help="SQLite database path (same value the web service uses)",
+    )
+    args = parser.parse_args()
+    dsn = os.environ.get("FESTIN_DB_DSN") or args.db or "data/festin.db"
+    asyncio.run(run_streaq_worker(dsn))
+
+
 def main() -> None:
     """CLI entry point: ``python -m festin.service``."""
     import argparse
@@ -313,14 +358,18 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1", help="Bind address")
     parser.add_argument("--port", type=int, default=8420, help="Bind port")
     parser.add_argument("--db", help="SQLite database path")
+    parser.add_argument("--db-dsn", help="Database DSN (e.g. postgres://...); overrides --db")
     parser.add_argument("--auth-file", help="Auth users file (username:password per line)")
     args = parser.parse_args()
-
+    attempts, window = _env_rate_limits()
     config = ServiceConfig(
         host=args.host,
         port=args.port,
         db_path=Path(args.db) if args.db else None,
+        db_dsn=args.db_dsn,
         auth_users_file=Path(args.auth_file) if args.auth_file else None,
+        rate_limit_attempts=attempts,
+        rate_limit_window=window,
     )
     asyncio.run(run_server(config))
 
