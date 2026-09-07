@@ -74,11 +74,10 @@ html {
   --md-footer-fg-color: var(--festin-muted);
   --md-admonition-bg-color: var(--festin-panel);
 }
-/* scheme variable sets — apply on html AND body (Material sets the attr
-   on both; without the body selector the var loses to Material defaults) */
+/* dark body painted directly — no var indirection, immune to palette.css
+   :root { --md-default-bg-color: #fff } cascade quirks */
 body[data-md-color-scheme="festin-dark"] {
-  --md-default-bg-color: var(--festin-bg);
-  --md-typeset-color: var(--festin-ink);
+  background: var(--festin-bg);
 }
 /* the article surface stays paper in every scheme */
 body .md-main,
