@@ -1,0 +1,24 @@
+{
+  "plan": [
+    {
+      "phase": "Service Package",
+      "items": ["Create festin/service/ package: database, auth, scheduler, app"]
+    },
+    {
+      "phase": "API Routers",
+      "items": ["Auth + Domain CRUD + Scan execution + Bucket browser endpoints"]
+    },
+    {
+      "phase": "Scheduler",
+      "items": ["Async per-domain scheduler with FastAPI lifespan lifecycle"]
+    },
+    {
+      "phase": "Frontend SPA",
+      "items": ["Login page, dashboard overview, domain detail, management panel"]
+    },
+    {
+      "phase": "CLI Rewrite",
+      "items": ["New serve command with --db --admin-user --password flags"]
+    }
+  ]
+}

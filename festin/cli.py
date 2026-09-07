@@ -287,27 +287,25 @@ def scan(
 @app.command(name="serve")
 def serve(
     host: Annotated[str, typer.Option("--host", help="Bind address.")] = "127.0.0.1",
-    port: Annotated[int, typer.Option("--port", min=0, help="Bind port (0 = ephemeral).")] = 8000,
-    state_file: Annotated[
+    port: Annotated[int, typer.Option("--port", min=0, help="Bind port (0 = ephemeral).")] = 8420,
+    db_path: Annotated[
         Path | None,
-        typer.Option("--state", help="State file exposing stored scans over the API."),
-    ] = None,
+        typer.Option("--db", help="SQLite database path for persistent storage."),
+      ] = None,
 ) -> None:
-    """Start the FestIn REST API server.
+     """Start the FestIn REST API server with SQLite backend and SPA frontend.
 
-    Endpoints live under /api/v1 (scans, findings, buckets, health). Scan
-    execution through the API is disabled: POST /api/v1/scans returns 503;
-    state endpoints work with --state.
-    """
-    from festin.api import ApiConfig, run_server
+    Endpoints live under /api/v1 (scans, findings, buckets, health, queues).
+    A monitoring dashboard SPA is served at the root path.
+     """
+    from festin.service import ServiceConfig, run_server
 
-    config = ApiConfig(host=host, port=port, state_file=state_file, scan_callback=None)
-    print(f"[*] FestIn API listening on http://{host}:{port}")
+    config = ServiceConfig(host=host, port=port, db_path=db_path)
+    print(f"[*] FestIn service listening on http://{host}:{port}")
     try:
         asyncio.run(run_server(config))
     except KeyboardInterrupt:
-        print("[*] Stopping FestIn API")
-
+        print("[*] Stopping FestIn service")
 
 def _warn_if_no_regex(domain_regex: str | None) -> None:
     if domain_regex:

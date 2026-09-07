@@ -1,0 +1,258 @@
+/* FestIn Monitoring Dashboard — Styles */
+
+*, *::before, *::after {
+     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, sans-serif;
+    background: #f8f9fa;
+    color: #212529;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+/* Header */
+
+.app-header {
+     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+     color: #fff;
+     padding: 2rem 0;
+     margin-bottom: 2rem;
+}
+
+.app-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.subtitle {
+    font-size: 0.95rem;
+    color: #a0aec0;
+    margin-top: 0.25rem;
+}
+
+/* Stats Bar */
+
+.stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+     background: #fff;
+    border-radius: 8px;
+    padding: 1.25rem;
+    text-align: center;
+     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.stat-card-critical { border-left: 4px solid #e53e3e; }
+.stat-card-high { border-left: 4px solid #dd6b20; }
+
+.stat-value {
+     display: block;
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Panels */
+
+.panel {
+     background: #fff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.panel h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+     border-bottom: 1px solid #edf2f7;
+}
+
+.badge {
+    background: #e2e8f0;
+    color: #4a5568;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 99px;
+    font-weight: 500;
+}
+
+/* Forms */
+
+.scan-form, .schedule-form {
+    display: flex;
+    gap: 0.75rem;
+     flex-wrap: wrap;
+}
+
+.scan-form input, .schedule-form input {
+    flex: 1;
+    min-width: 160px;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #d2d6dc;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.scan-form input:focus, .schedule-form input:focus {
+     outline: none;
+    border-color: #3182ce;
+    box-shadow: 0 0 0 3px rgba(49,130,206,0.15);
+}
+
+/* Buttons */
+
+.btn {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-primary {
+     background: #3182ce;
+    color: #fff;
+}
+
+.btn-primary:hover {
+     background: #2c5282;
+}
+
+.btn-secondary {
+     background: #edf2f7;
+     color: #4a5568;
+}
+
+.btn-secondary:hover {
+     background: #e2e8f0;
+}
+
+.btn-danger {
+     background: #fed7d7;
+     color: #c53030;
+ }
+
+.btn-sm {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+}
+
+/* List Containers */
+
+.list-container {
+     max-height: 400px;
+    overflow-y: auto;
+}
+
+.list-item {
+    padding: 0.75rem;
+     border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.list-item:last-child {
+     border-bottom: none;
+}
+
+.list-item:hover {
+     background: #fafafa;
+}
+
+.severity-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.severity-critical { background: #fed7d7; color: #c53030; }
+.severity-high { background: #feebc8; color: #c05621; }
+.severity-medium { background: #fefcbf; color: #975a16; }
+.severity-low { background: #c6f6d5; color: #276749; }
+
+/* Health Box */
+
+.health-box {
+    padding: 1rem;
+    border-radius: 6px;
+     background: #f0fff4;
+    border: 1px solid #c6f6d5;
+    color: #276749;
+}
+
+.health-box.error {
+    background: #fff5f5;
+    border-color: #fed7d7;
+     color: #c53030;
+}
+
+/* Filter Bar */
+
+.filter-bar select {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #d2d6dc;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    background: #fff;
+}
+
+/* Footer */
+
+.app-footer {
+    padding: 2rem 0;
+     color: #a0aec0;
+    font-size: 0.8rem;
+    text-align: center;
+    margin-top: 2rem;
+}
+
+/* Empty State */
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #a0aec0;
+    font-style: italic;
+}
+
+/* Loading spinner */
+
+.spinner::after {
+     content: "⟳";
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin {
+     to { transform: rotate(360deg); }
+}

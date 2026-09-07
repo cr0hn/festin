@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Festin — S3 Bucket Monitor</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="container">
+            <h1>Festin</h1>
+            <p class="subtitle">S3 Bucket Monitoring Dashboard</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Stats Bar -->
+        <section id="stats-bar" class="stats-bar">
+            <div class="stat-card">
+                <span class="stat-value" id="stat-scans">0</span>
+                <span class="stat-label">Scans</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="stat-findings">0</span>
+                <span class="stat-label">Findings</span>
+            </div>
+            <div class="stat-card stat-card-critical">
+                <span class="stat-value" id="stat-critical">0</span>
+                <span class="stat-label">Critical</span>
+            </div>
+            <div class="stat-card stat-card-high">
+                <span class="stat-value" id="stat-high">0</span>
+                <span class="stat-label">High</span>
+            </div>
+        </section>
+
+        <!-- Scan Queue -->
+        <section class="panel">
+            <h2>New Scan</h2>
+            <form id="scan-form" class="scan-form">
+                <input type="text" id="domains-input" placeholder="Enter domains (comma-separated)" required>
+                <button type="submit" class="btn btn-primary">Start Scan</button>
+            </form>
+        </section>
+
+        <!-- Scans List -->
+        <section class="panel">
+            <h2>Scan Queue <span id="queue-count" class="badge">0</span></h2>
+            <div id="scan-list" class="list-container"></div>
+        </section>
+
+        <!-- Scheduled Scans -->
+        <section class="panel">
+            <h2>Scheduled Scans</h2>
+            <form id="schedule-form" class="schedule-form">
+                <input type="text" id="schedule-domain" placeholder="Domain to monitor" required>
+                <input type="number" id="schedule-interval" placeholder="Minutes" value="60" min="5">
+                <button type="submit" class="btn btn-secondary">Schedule</button>
+            </form>
+            <div id="scheduled-list" class="list-container"></div>
+        </section>
+
+        <!-- Findings -->
+        <section class="panel">
+            <h2>Findings</h2>
+            <div class="filter-bar">
+                <select id="severity-filter">
+                    <option value="">All Severities</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div id="findings-list" class="list-container"></div>
+        </section>
+
+        <!-- Buckets -->
+        <section class="panel">
+            <h2>Buckets</h2>
+            <div id="buckets-list" class="list-container"></div>
+        </section>
+
+        <!-- Health -->
+        <section class="panel">
+            <h2>System Health</h2>
+            <div id="health-status" class="health-box">Checking...</div>
+        </section>
+    </main>
+
+    <footer class="app-footer container">
+        <p>Festin S3 Monitor &mdash; Monitoring dashboard for discovered S3 buckets.</p>
+    </footer>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
