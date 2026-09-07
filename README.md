@@ -5,7 +5,7 @@
 <h1 align="center">FestIn</h1>
 
 <p align="center">
-  <strong>The powered S3 bucket finder — now with a monitoring dashboard</strong>
+  <strong>Credentialless discovery and monitoring of exposed S3-compatible cloud storage from domains, DNS and web crawling.</strong>
 </p>
 
 <p align="center">

@@ -1,5 +1,5 @@
 site_name: FestIn
-site_description: S3 exposure scanner & multi-project monitoring dashboard
+site_description: Credentialless discovery and monitoring of exposed S3-compatible cloud storage from domains, DNS and web crawling.
 site_author: cr0hn
 site_url: ""
 repo_url: https://github.com/cr0hn/festin

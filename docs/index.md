@@ -4,7 +4,7 @@
   <img src="img/festin-logo-banner.png" alt="FestIn" width="140">
 </p>
 
-**FestIn** is a powered **S3 bucket finder** and a **multi-project exposure monitoring dashboard**.
+**FestIn** — **credentialless discovery and monitoring of exposed S3-compatible cloud storage from domains, DNS and web crawling.**
 
 Two tools in one package:
 
