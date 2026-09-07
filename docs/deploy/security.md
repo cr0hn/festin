@@ -35,6 +35,13 @@ FestIn finds exposure — don't let the dashboard become one.
 - [ ] **Bind to `127.0.0.1` or a private network** when not behind a proxy. `0.0.0.0` only inside containers.
 - [ ] **Treat findings as secrets.** The API redacts matches (`AKIA****EXAMPLE`) but rule names, buckets and object paths leak structure. Limit dashboard access like you limit your SIEM.
 - [ ] **Back up with `.backup`,** not `cp` ([docker](docker.md#data-lifecycle)).
+??? note "Dependabot alert: python-ecdsa (Minerva timing attack)"
+    `ecdsa` is a transitive dependency of `python-jose` (JWT support).
+    FestIn only uses **HS256** (symmetric HMAC) — module-level import
+    tracing confirms `ecdsa` is **never imported** at runtime, so the
+    P-256 timing attack does not apply. The alert is dismissed with this
+    justification. If you ever switch to asymmetric algorithms (ES256),
+    replace `python-jose` with PyJWT and re-evaluate.
 
 ## Auth model — know its edges
 
