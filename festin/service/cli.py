@@ -35,6 +35,21 @@ def serve(
     uvicorn.run(api_app, host=host, port=port, log_level="info")
 
 
+@app_cli.command("worker", help="Run the streaQ scan worker (FESTIN_QUEUE=streaq)")
+def worker(
+    db_path: str = "data/festin.db",
+    redis_url: str = "redis://localhost:6379/0",
+) -> None:
+    """Consume scan jobs from Redis Streams and execute them."""
+    import os
+
+    from .serve import run_worker
+
+    os.environ.setdefault("FESTIN_REDIS_URL", redis_url)
+    os.environ.setdefault("FESTIN_DB_DSN", db_path)
+    run_worker()
+
+
 @app_cli.command("version", help="Print FestIn Monitor version")
 def show_version() -> None:
     print("FestIn Monitor 0.3.0")

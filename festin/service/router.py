@@ -104,7 +104,10 @@ async def scan_start(request: web.Request) -> web.Response:
     domains = await db.list_domains()
     results = []
     for dom in domains:
-        res = await qm.queue().push_scan_job({"domain": dom})
+        if qm.mode == "streaq":
+            res = await qm.enqueue_scan(0, 0, [dom])
+        else:
+            res = await qm.queue().push_scan_job({"domain": dom})
         results.append(res)
     return web.json_response(
         {
@@ -224,6 +227,51 @@ class FestinRouter:
         self._scheduler = scheduler
         self._scan_callback = scan_callback
         self._auth = auth
+
+    async def _dispatch_scan(
+        self, scan_id: int, domain_id: int, domains: list[str]
+    ) -> str | None:
+        """Send a scan job to the configured backend.
+
+        streaq mode: enqueue onto Redis Streams and return the streaq task id.
+        memory mode (default): execute in-process; returns None.
+        """
+        qm = self._queues
+        if qm is not None and qm.mode == "streaq":
+            return await qm.enqueue_scan(scan_id, domain_id, domains)
+        asyncio.create_task(self._execute_in_process(scan_id, domains))
+        return None
+
+    async def _execute_in_process(self, scan_id: int, domains: list[str]) -> None:
+        """In-memory pipeline: mirrors _execute_scan defined in add_routes."""
+        await self._db.update_scan_status(scan_id, status="running")
+        try:
+            from festin.scan_runner import build_namespace, run_scan
+
+            cli_args = build_namespace(
+                quiet=True,
+                no_print=True,
+                scan_id=f"svc-{scan_id}",
+            )
+            result_obj = await run_scan(cli_args, domains)
+            if result_obj is not None:
+                await self._db.persist_scan_results(
+                    scan_id, result_obj.buckets, result_obj.findings
+                )
+            buckets = len(getattr(result_obj, "buckets", []) or [])
+            findings = len(getattr(result_obj, "findings", []) or [])
+        except Exception:
+            logger.exception("Scan %s failed", scan_id)
+            buckets = findings = 0
+            status = "failed"
+        else:
+            status = "completed"
+        await self._db.update_scan_status(
+            scan_id,
+            status=status,
+            buckets_found=buckets,
+            findings_count=findings,
+        )
 
     def add_routes(self, app: web.Application, prefix: str = "/api/v1") -> None:
         """Register all API routes on the given aiohttp application."""
@@ -510,7 +558,9 @@ class FestinRouter:
             if not isinstance(project_id, int) or project_id < 1:
                 raise web.HTTPBadRequest(reason="'project_id' must be a positive integer")
 
-            async def _persist_scan(domain_name: str, pid: int) -> int:
+            async def _persist_scan(
+                domain_name: str, pid: int
+            ) -> tuple[int, int]:
                 """Create (or reuse) the domain row and open a scan record."""
                 existing = await self._db.find_domain(domain_name)
                 domain_id = (
@@ -518,7 +568,7 @@ class FestinRouter:
                     if existing
                     else await self._db.create_domain(domain_name, pid)
                 )
-                return await self._db.create_scan(domain_id)
+                return await self._db.create_scan(domain_id), domain_id
 
             async def _execute_scan(scan_id: int, domain_list: list[str]) -> None:
                 """Run festin's scan pipeline and persist the outcome."""
@@ -552,17 +602,23 @@ class FestinRouter:
 
             if self._scan_callback is not None:
                 await self._scan_callback(domains)
-                scan_id = await _persist_scan(domains[0], project_id)
-                return web.json_response({"scan_id": scan_id, "status": "accepted"}, status=202)
+                scan_id, _ = await _persist_scan(domains[0], project_id)
+                return web.json_response(
+                    {"scan_id": scan_id, "status": "accepted"}, status=202
+                )
 
             if self._scheduler is None or not hasattr(self._scheduler, "enqueue"):
                 raise web.HTTPServiceUnavailable(reason="No scan backend configured")
 
             job = await self._scheduler.enqueue(domains)
-            scan_id = await _persist_scan(domains[0], project_id)
-            asyncio.create_task(_execute_scan(scan_id, domains))
+            scan_id, domain_id = await _persist_scan(domains[0], project_id)
+            job_id = await self._dispatch_scan(scan_id, domain_id, domains)
             return web.json_response(
-                {"scan_id": scan_id, "job_id": job.get("job_id"), "status": "accepted"},
+                {
+                    "scan_id": scan_id,
+                    "job_id": job_id or str(job.get("job_id") or ""),
+                    "status": "accepted",
+                },
                 status=202,
             )
 
