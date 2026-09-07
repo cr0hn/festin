@@ -56,7 +56,7 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
     config.db_path.parent.mkdir(parents=True, exist_ok=True)
     db = Database(config.db_path)
     queue_mgr = QueueManager()
-    scheduler = Scheduler()
+    scheduler = Scheduler(database=db)
 
     # -- Auth middleware: JWT when available (festin.service.auth), falling
     #    back to the legacy AuthMiddleware so startup never blocks. --
@@ -78,7 +78,17 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
         @web.middleware
         async def _mw(request: web.Request, handler: Any) -> web.StreamResponse:
             path = request.path
-            if path in _exempt_paths or path.startswith(_exempt_prefixes):
+            if path.startswith(_exempt_prefixes):
+                return await handler(request)
+            if path in _exempt_paths and path != "/api/v1/auth/register":
+                return await handler(request)
+            if path == "/api/v1/auth/register":
+                 # Verify the token if present so the handler can tell an
+                 # admin apart; but let anonymous requests through too —
+                 # the first-user bootstrap decides there.
+                auth_header = request.headers.get("Authorization", "")
+                if auth_header:
+                    return await instance.__call__(request, handler)
                 return await handler(request)
             return await instance.__call__(request, handler)
 
@@ -90,7 +100,12 @@ async def create_app(config: ServiceConfig | None = None) -> web.Application:
         from .auth import AuthService, JWTMiddleware
 
         auth_service = AuthService(db, secret_key=secret)
-        jwt_mw = JWTMiddleware.from_secret(secret, exempt_paths=set(_exempt_paths))
+        # register NOT exempt: middleware identifies the admin Bearer so the
+        # handler can authorize; anonymous bootstrap passes through via the
+        # no-Authorization path inside JWTMiddleware.
+        jwt_mw = JWTMiddleware.from_secret(
+            secret, exempt_paths=set(_exempt_paths) - {"/api/v1/auth/register"}
+        )
         middlewares.append(_wrap_middleware(jwt_mw))
         logger.info("JWT authentication middleware enabled")
     except ImportError:

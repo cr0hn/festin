@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass
 from typing import Any
+
+logger = logging.getLogger("festin.service.scheduler")
 
 
 @dataclass
@@ -99,12 +102,38 @@ class FestInScheduler:
         return result
 
     async def _scan_loop(self) -> None:
-        """Periodic loop: check domains and trigger scans when due."""
+        """Periodic loop: run every scheduled scan whose interval elapsed."""
+        last_run: dict[int, float] = {}
         while self._running:
             try:
                 await asyncio.sleep(self.config.check_interval)
+                db = self.database
+                if db is None:
+                    continue
+                schedules = await db.list_scheduled_scans()
+                now = time.time()
+                for entry in schedules:
+                    entry_id = entry["id"]
+                    interval = max(1, int(entry.get("interval_minutes", 60))) * 60
+                    if now - last_run.get(entry_id, 0.0) < interval:
+                        continue
+                    last_run[entry_id] = now
+                    domain = entry.get("domain", "")
+                    if not domain:
+                        continue
+                    existing = await db.find_domain(domain)
+                    domain_id = (
+                        existing["domain_id"] if existing
+                        else await db.create_domain(domain)
+                    )
+                    logger.info(
+                        "Scheduled scan %s firing for %s", entry_id, domain
+                    )
+                    asyncio.create_task(self.trigger_scan(domain_id, domain))
             except asyncio.CancelledError:
                 break
+            except Exception:
+                logger.exception("Scheduled scan loop iteration failed")
 
 
 class ScanOrchestrator:

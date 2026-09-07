@@ -347,3 +347,21 @@ body {
 [hidden] {
     display: none !important;
 }
+
+/* -- Flash toast -- */
+.flash-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    background: #2d3748;
+    color: #fff;
+    padding: 0.75rem 1.25rem;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    font-size: 0.9rem;
+    z-index: 1000;
+    transition: opacity 0.3s ease;
+    opacity: 1;
+}
+.flash-toast.flash-error { background: #c53030; }
+.flash-toast.flash-hidden { opacity: 0; pointer-events: none; }

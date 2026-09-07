@@ -48,8 +48,22 @@
         return "severity-" + (sev || "low");
     }
 
+    let flashTimer;
+    function showFlash(message, isError) {
+        let el = document.getElementById("flash-toast");
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "flash-toast";
+            document.body.appendChild(el);
+        }
+        el.textContent = message;
+        el.className = "flash-toast" + (isError ? " flash-error" : "");
+        clearTimeout(flashTimer);
+        flashTimer = setTimeout(() => { el.className += " flash-hidden"; }, 3500);
+    }
+
     function formatDate(ts) {
-         if (!ts) return "—";
+        if (!ts) return "—";
         const d = new Date(ts);
         return d.toLocaleString();
     }
@@ -94,9 +108,9 @@
         try {
              await apiFetch("/scans/" + encodeURIComponent(scanId), { method: "DELETE" });
             await renderScanList();
-             alert("Scan deleted");
-         } catch (err) {
-            alert("Error: " + err.message);
+            showFlash("Scan deleted");
+        } catch (err) {
+            showFlash("Error: " + escapeHtml(err.message), true);
          }
     }
 
@@ -172,7 +186,7 @@
              await apiFetch("/queues/schedule/" + id, { method: "DELETE" });
             await renderScheduled();
          } catch (err) {
-            alert("Error: " + err.message);
+            showFlash("Error: " + escapeHtml(err.message), true);
         }
     }
 
@@ -209,11 +223,11 @@
                 headers: { "Content-Type": "application/json" },
                  body: JSON.stringify({ domains }),
              });
-            alert("Scan started for: " + domains.join(", "));
+            showFlash("Scan started for: " + escapeHtml(domains.join(", ")));
             input.value = "";
             await renderScanList();
         } catch (err) {
-            alert("Error starting scan: " + err.message);
+            showFlash("Error starting scan: " + escapeHtml(err.message), true);
          }
     }
 
@@ -231,7 +245,7 @@
             document.getElementById("schedule-domain").value = "";
              await renderScheduled();
         } catch (err) {
-            alert("Error scheduling: " + err.message);
+            showFlash("Error scheduling: " + escapeHtml(err.message), true);
         }
     }
 
@@ -323,6 +337,8 @@
         showLogin();
     }
 
+    let registerMode = false;
+
     async function handleLoginSubmit(e) {
         e.preventDefault();
         clearLoginError();
@@ -332,23 +348,19 @@
             showLoginError("Username and password are required");
             return;
         }
-        try {
-            await login(username, password);
-            startSession(username);
-        } catch (err) {
-            showLoginError("Sign in failed: " + err.message);
+        if (registerMode) {
+            await doRegister(username, password);
+        } else {
+            try {
+                await login(username, password);
+                startSession(username);
+            } catch (err) {
+                showLoginError("Sign in failed: " + err.message);
+            }
         }
     }
 
-    async function handleRegisterSubmit(e) {
-        e.preventDefault();
-        clearLoginError();
-        const username = document.getElementById("login-username").value.trim();
-        const password = document.getElementById("login-password").value;
-        if (!username || !password) {
-            showLoginError("Username and password are required");
-            return;
-        }
+    async function doRegister(username, password) {
         try {
             await register(username, password);
             // First user registered: try to sign in immediately
@@ -358,30 +370,25 @@
             } catch (_) {
                 showLoginError("Account created — please sign in");
             }
+            registerMode = false;
+            resetAuthForm();
         } catch (err) {
             showLoginError(err.message);
         }
     }
 
-    // -- Init --
-
-    async function refreshAll() {
-        await Promise.all([
-            renderStats(),
-            renderScanList(),
-            renderFindings(),
-            renderBuckets(),
-            renderScheduled(),
-            renderHealth(),
-        ]);
+    function toggleRegisterMode() {
+        registerMode = !registerMode;
+        resetAuthForm();
     }
 
-    function startSession(username) {
-        clearLoginError();
-        showDashboard(username);
-        refreshAll();
-        clearInterval(refreshInterval);
-        refreshInterval = setInterval(refreshAll, 30000);
+    function resetAuthForm() {
+        const btn = document.getElementById("login-submit");
+        const link = document.getElementById("register-toggle");
+        const title = document.getElementById("login-title");
+        if (btn) btn.textContent = registerMode ? "Create account" : "Sign in";
+        if (link) link.textContent = registerMode ? "Back to sign in" : "Create admin account";
+        if (title) title.textContent = registerMode ? "Create Admin Account" : "Sign in to Festin";
     }
 
     function init() {
@@ -392,6 +399,10 @@
         // Auth bindings
         document.getElementById("login-form").addEventListener("submit", handleLoginSubmit);
         document.getElementById("logout-btn").addEventListener("click", logout);
+        document.getElementById("register-toggle").addEventListener("click", (e) => {
+            e.preventDefault();
+            toggleRegisterMode();
+        });
 
         // Severity filter change
         document.getElementById("severity-filter").addEventListener("change", renderFindings);

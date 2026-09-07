@@ -194,9 +194,13 @@ class JWTMiddleware:
     # visible on the instance, not only on the decorated __call__ function.
     __middleware_version__ = 1
 
+    # NOTE: /api/v1/auth/register is intentionally NOT exempt: the handler
+    # needs request["user"] to tell an admin apart when users already exist.
+    # Anonymous first-user bootstrap still works because the middleware
+    # passes requests without an Authorization header through to the
+    # register handler, which checks user_count there.
     DEFAULT_EXEMPT_PATHS = frozenset({
         "/api/v1/auth/login",
-        "/api/v1/auth/register",
         "/api/v1/health",
     })
 
@@ -228,6 +232,10 @@ class JWTMiddleware:
             return await handler(request)
 
         auth_header = request.headers.get("Authorization", "")
+        if (request.path == "/api/v1/auth/register"
+                and not auth_header.startswith("Bearer ")):
+             # First-user bootstrap: let the register handler decide.
+            return await handler(request)
         if not auth_header.startswith("Bearer "):
             raise web.HTTPUnauthorized(
                 text='{"error": "unauthorized"}',
