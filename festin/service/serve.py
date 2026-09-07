@@ -6,10 +6,11 @@ import asyncio
 import logging
 import os
 import sys
+import time
+from collections import deque
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
-
 from aiohttp import web
 
 from ..models import ScanResult
@@ -34,6 +35,8 @@ class ServiceConfig:
         state_file: Path | None = None,
         auth_users_file: Path | None = None,
         scan_callback: Callable[[list[str]], Awaitable[ScanResult]] | None = None,
+        rate_limit_attempts: int = 5,
+        rate_limit_window: int = 60,
     ) -> None:
         self.host = host
         self.port = port
@@ -42,6 +45,91 @@ class ServiceConfig:
         self.state_file = state_file
         self.auth_users_file = auth_users_file
         self.scan_callback = scan_callback
+        self.rate_limit_attempts = rate_limit_attempts
+        self.rate_limit_window = rate_limit_window
+
+
+# -- In-app rate limiting for auth endpoints (login + register). --
+
+_RATE_LIMITED_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register"}
+
+
+class SlidingWindowLimiter:
+    """Per-IP sliding window counter for auth endpoints.
+
+    Timestamps are ``time.monotonic()`` values stored per client IP in a
+    plain dict of deques — no external dependencies, no locks needed
+    (single event loop). Time is injected so tests can freeze it.
+    """
+
+    def __init__(
+        self,
+        max_attempts: int = 5,
+        window_seconds: int = 60,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.max_attempts = max_attempts
+        self.window_seconds = window_seconds
+        self._clock = clock
+        self._attempts: dict[str, deque[float]] = {}
+
+    def _prune(self, ip: str, now: float) -> None:
+        """Drop timestamps outside the window for this IP."""
+        window = self._attempts.get(ip)
+        if window is None:
+            return
+        cutoff = now - self.window_seconds
+        while window and window[0] <= cutoff:
+            window.popleft()
+
+    def check(self, ip: str) -> tuple[bool, int]:
+        """Return ``(allowed, seconds_until_next_slot)`` for this IP."""
+        now = self._clock()
+        self._prune(ip, now)
+        window = self._attempts.setdefault(ip, deque())
+        if len(window) >= self.max_attempts:
+            oldest = window[0]
+            retry_after = max(1, int(self.window_seconds - (now - oldest)) + 1)
+            return False, retry_after
+        window.append(now)
+        return True, 0
+
+
+def _client_ip(request: web.Request) -> str:
+    return request.remote or "unknown"
+
+
+def _is_exempt_ip(ip: str) -> bool:
+    """Local loopback is exempt only when explicitly enabled via env."""
+    return (
+        os.environ.get("FESTIN_RATE_LIMIT_EXEMPT_LOCAL", "").lower() == "true"
+        and ip in ("127.0.0.1", "::1")
+    )
+
+
+def _rate_limit_middleware(limiter: SlidingWindowLimiter) -> Any:
+    """Wrap the limiter in a new-style aiohttp middleware (see
+    ``_wrap_middleware`` below: aiohttp 3.14 does not dispatch instance
+    middlewares without this pattern)."""
+
+    @web.middleware
+    async def _rate_limiter(request: web.Request, handler: Any) -> web.StreamResponse:
+        if request.method != "POST" or request.path not in _RATE_LIMITED_PATHS:
+            return await handler(request)
+        ip = _client_ip(request)
+        if _is_exempt_ip(ip):
+            return await handler(request)
+        allowed, retry_after = limiter.check(ip)
+        if not allowed:
+            return web.json_response(
+                {"error": "too many attempts, retry later"},
+                status=429,
+                headers={"Retry-After": str(retry_after)},
+            )
+        return await handler(request)
+
+    return _rate_limiter
+
 
 
 async def create_app(config: ServiceConfig | None = None) -> web.Application:

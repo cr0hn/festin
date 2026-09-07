@@ -477,6 +477,19 @@ class Database:
         await self._conn.commit()
         return cursor.rowcount > 0
 
+    async def list_stale_running_scans(self, cutoff_ts: str) -> list[dict[str, Any]]:
+        """Running scans whose started_at is older than the cutoff (ISO)."""
+        cursor = await self._conn.execute(
+            "SELECT id, started_at FROM scans "
+            "WHERE status = 'running' AND started_at IS NOT NULL "
+            "AND started_at <= ?",
+            (cutoff_ts,),
+        )
+        rows = []
+        for row in await cursor.fetchall():
+            rows.append({"scan_id": row[0], "started_at": row[1]})
+        return rows
+
     async def get_all_scans(self, offset: int = 0, limit: int = 100) -> dict[str, Any]:
         """Return all scans with total count."""
         count_cursor = await self._conn.execute("SELECT COUNT(*) FROM scans")

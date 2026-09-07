@@ -103,6 +103,25 @@ class FestInScheduler:
         )
         return result
 
+    async def _reap_stale_scans(self, db: Any) -> None:
+        """Mark running scans as failed when scan_timeout has elapsed.
+
+        Protects against executor tasks that died without updating status
+        (crash, worker loss): without this they stay 'running' forever.
+        """
+        cutoff = time.strftime(
+            "%Y-%m-%dT%H:%M:%SZ",
+            time.gmtime(time.time() - self.config.scan_timeout),
+        )
+        stale = await db.list_stale_running_scans(cutoff)
+        for scan in stale:
+            logger.warning(
+                "Scan %s exceeded timeout (%.0fs in 'running') — marking failed",
+                scan["scan_id"],
+                self.config.scan_timeout,
+            )
+            await db.update_scan_status(scan["scan_id"], status="failed")
+
     async def _scan_loop(self) -> None:
         """Periodic loop: run every scheduled scan whose interval elapsed."""
         last_run: dict[int, float] = {}
@@ -112,6 +131,7 @@ class FestInScheduler:
                 db = self.database
                 if db is None:
                     continue
+                await self._reap_stale_scans(db)
                 schedules = await db.list_scheduled_scans()
                 now = time.time()
                 for entry in schedules:
