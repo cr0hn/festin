@@ -11,9 +11,9 @@
 <p align="center">
   <a href="#development"><img src="https://img.shields.io/badge/CI-GitHub_Actions-blue" alt="CI"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.13%2B-blue" alt="Python 3.13+"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Dual--Personal%2FCommercial-green" alt="License: Personal and Commercial"></a>
-  <a href="https://docs.astral.sh/ruff/"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
   <a href="https://hub.docker.com/r/cr0hn/festin"><img src="https://img.shields.io/docker/pulls/cr0hn/festin" alt="Docker pulls"></a>
+  <a href="https://pypi.org/project/festin/"><img src="https://img.shields.io/pypi/v/festin" alt="PyPI version"></a>
+  <a href="https://docs.astral.sh/ruff/"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
 </p>
 
 ---
