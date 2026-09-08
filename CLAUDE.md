@@ -44,23 +44,26 @@ docs/                  → PROJECT.md (guía profunda), DESIGN_DECISIONS.md, RUN
 1. **Tests siempre con timeout doble**: `timeout 130 uv run pytest --timeout=30 -q`.
    Hay tests que cuelgan indefinidamente sin él. Ya pasó dos veces.
 2. **NUNCA `git push`** sin orden explícita del usuario.
-3. **JS tras cirugía**: `node --check` es insuficiente (errores runtime no
+3. **POLÍTICA DE VERSIONES — NUNCA subas el minor sin orden expresa del
+   usuario.** Solo bumps de parche (0.4.0 → 0.4.1) de forma autónoma cuando
+   haya que publicar. Los minor (0.4.0 → 0.5.0) los decide Daniel.
+4. **JS tras cirugía**: `node --check` es insuficiente (errores runtime no
    son sintaxis). Verifica que toda función llamada está definida:
    `grep -o 'nombreFuncion(' festin/service/static/js/app.js | head` vs su
    `function nombreFuncion(`. Ya costó dos bugs (`startSession`, `refreshAll`).
-4. **Contratos congelados** (romperlos = regresión):
+5. **Contratos congelados** (romperlos = regresión):
    - `GET /queues/schedule` devuelve clave `scheduled` (no `schedules`)
    - `POST /auth/register` NO está exento en el middleware JWT (el admin
      debe poder autenticarse ahí; bootstrap anónimo pasa por la rama sin header)
    - `serve` CLI usa `--db` (no `--state`)
-5. **Verificación de UI**: siempre headless browser contra el servidor real
+6. **Verificación de UI**: siempre headless browser contra el servidor real
    (`localhost:8420`). `localStorage.clear()` antes de testear login — el
    estado residual engaña.
-6. **Multi-proyecto**: `projects` tabla; todo dominio/scan pertenece a un
+7. **Multi-proyecto**: `projects` tabla; todo dominio/scan pertenece a un
    proyecto (default id=1). `run-scan` acepta `project_id`. Los resultados
    reales (buckets/findings) se insertan como filas via
    `persist_scan_results` — nunca solo contar.
-7. **Roles**: admin gestiona usuarios/proyectos (mutations); viewer solo
+8. **Roles**: admin gestiona usuarios/proyectos (mutations); viewer solo
    lectura. El select de rol de TU PROPIO usuario va disabled en la UI
    (self-demotion = lockout). Borrar último admin → 400.
 

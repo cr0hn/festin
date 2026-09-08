@@ -51,14 +51,16 @@ uv run mkdocs serve
     - `serve` module CLI uses `--db` (not `--state`)
     - findings/buckets are persisted as **rows**, not just counters
 
-5. **Static assets are cache-busted with `?v=N`** in `index.html` — bump the version on every JS/CSS change, or browsers serve stale copies.
-6. **HTML edits**: validate tag balance after touching `index.html` (a lost tag once made the whole SPA inert):
+5. **VERSION POLICY — never bump the minor without the owner's explicit order.** Patch bumps only (0.4.0 → 0.4.1) autonomously when a publish is needed. Minor decisions (0.4.0 → 0.5.0) belong to Daniel.
+
+6. **Static assets are cache-busted with `?v=N`** in `index.html` — bump the version on every JS/CSS change, or browsers serve stale copies.
+7. **HTML edits**: validate tag balance after touching `index.html` (a lost tag once made the whole SPA inert):
 
     ```bash
     python3 -c "from html.parser import HTMLParser; HTMLParser().feed(open('festin/service/static/index.html').read())" && echo parsed
     ```
 
-7. **UI verification** is done with a headless browser against the real server (`localhost:8420`) with `localStorage.clear()` first — residual state lies.
+8. **UI verification** is done with a headless browser against the real server (`localhost:8420`) with `localStorage.clear()` first — residual state lies.
 
 ## Testing conventions
 
