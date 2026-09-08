@@ -71,6 +71,7 @@ nav:
   - Reference:
       - Architecture: reference/architecture.md
       - Design decisions (ADR): reference/design-decisions.md
+      - Pitfalls & lessons: pitfalls/index.md
 
       - Runbook & troubleshooting: reference/runbook.md
       - Development: reference/development.md

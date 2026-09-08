@@ -152,9 +152,9 @@ Commit with a descriptive message (repo convention: `type(scope): summary`
 
 ---
 
-## Level 7 — Legacy files (do not extend)
+## Level 7 — Pitfalls & lessons
 
-`docs/PROJECT.md`, `docs/RUNBOOK.md`, `docs/DESIGN_DECISIONS.md` are the
-old internal Spanish docs — kept for history, excluded from the MkDocs
-site, superseded by the English `docs/` site. Don't update them; the
-MkDocs site is the single source of truth.
+Field-tested gotchas live in `docs/pitfalls/` (index with "open when"
+symptoms). Check them BEFORE debugging: aiohttp middleware dispatch, HTML
+tag-balance breaking the SPA, PyPI same-version re-upload rejection, the
+parallel-agents worktree method, and headless SPA verification methodology.
