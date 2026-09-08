@@ -1,4 +1,4 @@
-"""festin.service.cli - Typer CLI launching FestIn Monitor FastAPI SPA."""
+"""festin.service.cli - Typer CLI launching the FestIn monitoring dashboard."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ def serve(
     host: str = "0.0.0.0",
     secret_key: str = "festin-secret-change-me",
 ) -> None:
-    """Launch the FestIn Monitor FastAPI SPA dashboard."""
+    """Launch the FestIn monitoring dashboard."""
     from .app import FestInApp, create_app
 
     if admin_pass is None:
@@ -30,7 +30,7 @@ def serve(
         jwt_secret=secret_key,
     )
     api_app = create_app(festin_app)
-    print(f"[serve] Starting FastAPI SPA dashboard at {host}:{port}")
+    print(f"[serve] Starting FestIn dashboard at {host}:{port}")
     print(f"[serve] Admin user: {admin_user} / password: {admin_pass}")
     uvicorn.run(api_app, host=host, port=port, log_level="info")
 
