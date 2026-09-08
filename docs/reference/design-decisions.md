@@ -1,6 +1,6 @@
 # Design decisions (ADR summary)
 
-Why things are the way they are — and what was rejected. The short version of the full [DESIGN_DECISIONS.md](https://github.com/cr0hn/festin/blob/master/docs/DESIGN_DECISIONS.md) in the repo.
+Why things are the way they are — and what was rejected.
 
 ## 1. aiohttp for the service (not FastAPI)
 
