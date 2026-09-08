@@ -4,6 +4,12 @@ on:
   push:
     branches: [master]
     tags: ["v*"]
+    paths:
+      - "festin/**"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/docker.yml"
   workflow_dispatch:
 
 permissions:
