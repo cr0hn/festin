@@ -3,8 +3,19 @@ name: CI
 on:
   push:
     branches: [master]
+    paths:
+      - "festin/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/ci.yml"
   pull_request:
-
+    paths:
+      - "festin/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/ci.yml"
 jobs:
   test:
     runs-on: ubuntu-latest
