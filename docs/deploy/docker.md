@@ -26,13 +26,17 @@ docker run -d --name festin \
   -p 8420:8420 \
   -e FESTIN_JWT_SECRET=$FESTIN_JWT_SECRET \
   -v festin-data:/data \
-  festin:local
+  cr0hn/festin:latest
 
 # register the admin (bootstrap)
 curl -X POST localhost:8420/api/v1/auth/register \
   -H 'Content-Type: application/json' \
   -d '{"username": "admin", "password": "a-strong-password"}'
 ```
+
+Prebuilt images: [`cr0hn/festin`](https://hub.docker.com/r/cr0hn/festin) —
+multi-arch (amd64 + arm64), published automatically by CI on every push to
+`master` and on `v*` tags.
 
 ## docker compose (recommended)
 
@@ -45,6 +49,60 @@ docker compose up -d
 # anonymized-scanning variant
 docker compose --profile tor up -d
 ```
+
+## Production configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `FESTIN_JWT_SECRET` | dev fallback | JWT signing — **always set in production** |
+| `FESTIN_DB_DSN` | SQLite path | `postgres://user:pass@host:5432/festin` → PostgreSQL backend |
+| `FESTIN_QUEUE` | `memory` | `streaq` = durable Redis Streams queue |
+| `FESTIN_REDIS_URL` | `redis://localhost:6379/0` | Redis endpoint (streaq mode) |
+| `FESTIN_RATE_LIMIT_ATTEMPTS` / `_WINDOW` | 5 / 60 | login + register throttle |
+
+Full reference: [configuration](../usage/configuration.md).
+
+### Production topology (SQLite)
+
+```yaml
+services:
+  festin:
+    image: cr0hn/festin:latest
+    environment:
+      FESTIN_JWT_SECRET: ${FESTIN_JWT_SECRET}
+    volumes: [festin-data:/data]
+    ports: ["8420:8420"]
+```
+
+### Production topology (PostgreSQL + queue workers)
+
+```yaml
+services:
+  festin-api:
+    image: cr0hn/festin:latest
+    environment:
+      FESTIN_JWT_SECRET: ${FESTIN_JWT_SECRET}
+      FESTIN_DB_DSN: ${FESTIN_DB_DSN}          # postgres://...
+      FESTIN_QUEUE: streaq
+      FESTIN_REDIS_URL: redis://redis:6379/0
+    ports: ["8420:8420"]
+    deploy: {replicas: 2}
+
+  festin-worker:
+    image: cr0hn/festin:latest
+    command: festin-worker
+    environment:
+      FESTIN_DB_DSN: ${FESTIN_DB_DSN}
+      FESTIN_REDIS_URL: redis://redis:6379/0
+    deploy: {replicas: 2}                      # scan throughput knob
+
+  redis:
+    image: redis:7-alpine
+```
+
+The API only **enqueues**; workers **consume**. Restart API pods freely —
+queued scans survive in Redis. Scale `festin-worker` replicas for scan
+throughput. Full HA patterns: [high availability](ha.md).
 
 ## Operation
 
@@ -92,8 +150,10 @@ FestIn serves plain HTTP — terminate TLS in front:
     }
     ```
 
-!!! warning "Rate-limit `/api/v1/auth/login` at the proxy"
-    The service has no built-in brute-force protection (see [security hardening](security.md)).
+!!! tip "Rate limiting"
+    Login and register are rate-limited **in-app** (5 attempts / 60 s per IP
+    by default — see [configuration](../usage/configuration.md)). Adding a
+    proxy-level limit as well is recommended as a second layer.
 
 ## Data lifecycle
 

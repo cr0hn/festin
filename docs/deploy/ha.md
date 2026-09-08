@@ -2,29 +2,29 @@
 
 What HA means for FestIn, what works today, and the supported paths to scale.
 
-## Current state of the world
+## Component matrix (0.4.0)
 
-<span class="chip chip-warn">STATE</span> The service is designed as a **single-node, single-process** deployment:
-
-| Component | Today | Constraint |
+| Component | 0.4.0 state | Constraint |
 |---|---|---|
-| Database | SQLite, **one global connection** | no multi-process sharing; single writer |
-| Scan queue | in-memory (`asyncio` tasks) | jobs die with the pod |
-| Scheduler | in-process loop (10 s tick) | `last_run` is memory state |
+| Database | SQLite (default) **or PostgreSQL** (`FESTIN_DB_DSN`) | SQLite = single writer; PG = multi-replica ready |
+| Scan queue | **memory** (default) or **streaQ** (Redis Streams) via `FESTIN_QUEUE` | memory = jobs die with the pod; streaq = survive + scale |
+| Scheduler | in-process loop (10 s tick) | still one instance; schedules in DB |
+| Scan watchdog | marks stuck `running` scans as `failed` after `scan_timeout` | ![ok][ok] protects against dead executors |
 | Auth | JWT HS256 — stateless | ![ok][ok] survives restarts, works across replicas |
-| UI/API | stateless handlers | ![ok][ok] horizontally scalable *for reads* |
+| UI/API | stateless handlers | ![ok][ok] horizontally scalable |
 
-What this means operationally:
+What each mode means operationally:
 
-- **One dashboard instance** attached to one SQLite file.
-- Pod restart = in-flight scans lost (status rows stay `running`), schedules re-fire on the first tick.
-- Kubernetes `strategy: Recreate` + single replica is the honest topology.
+- **SQLite + memory queue**: one dashboard instance, one SQLite file. Pod
+  restart = in-flight scans reaped as `failed` by the watchdog; schedules
+  re-fire on the first tick.
+- **PostgreSQL + streaq queue**: N API replicas + N `festin-worker`
+  consumers. In-flight scans survive API restarts. This is the
+  production topology.
 
-## Supported HA patterns
+## Topology 1 — Active/passive, SQLite <span class="chip chip-ok">SIMPLEST</span>
 
-### Pattern 1 — Active/passive with fast failover <span class="chip chip-ok">WORKS TODAY</span>
-
-The pragmatic 99.9% solution:
+The pragmatic small-team solution:
 
 ```
             ┌────────────┐
@@ -36,63 +36,162 @@ ingress ───▶│   proxy    │───▶ festin-0 (active)
             festin pod moves to another node, remounts volume
 ```
 
-- Kubernetes already gives you this: the pod reschedules, the PVC re-attaches, SQLite is consistent.
-- Keep `replicas: 1`, `strategy: Recreate`, `readinessProbe` on `/api/v1/health`.
+- Kubernetes already gives you this: the pod reschedules, the PVC
+  re-attaches, SQLite is consistent.
+- Keep `replicas: 1`, `strategy: Recreate`, `readinessProbe` on
+  `/api/v1/health`.
 - RTO = pod reschedule time (seconds–minutes). RPO = last SQLite backup.
-- Add a CronJob backup every N minutes → RPO bounded by backup cadence.
+- Add a Litestream sidecar (S3 tail) or a CronJob backup → RPO bounded by
+  backup cadence.
 
-**This is the recommended setup** until SQLite becomes the bottleneck.
+**Recommended** until concurrency or durability demands more.
 
-### Pattern 2 — Read replicas of the UI <span class="chip chip-ok">WORKS TODAY</span>
+## Topology 2 — PostgreSQL + streaQ workers <span class="chip chip-ok">PRODUCTION</span>
 
-Auth (JWT) is stateless and handlers are read-mostly:
+The full production topology, all pieces shipped in 0.4.0:
 
-- Run **N dashboard replicas** that serve UI + API reads.
-- All *mutations* and the scheduler live in **one** active instance.
-- SQLite: replicate via Litestream (S3 tail) or SQLite WAL streaming; replicas restore a read-only copy.
-
-Caveat: replicas must not run the scheduler or accept mutations → small patch: disable the scheduler + run behind a proxy that routes `POST/DELETE/PATCH` to the active instance. Worth it only if read traffic actually matters.
-
-### Pattern 3 — PostgreSQL backend <span class="chip chip-ok">IMPLEMENTED 0.4.0</span>
-
-The real unlock for multi-replica:
-
-```text
-[ingress] → N × (API + UI pods)  →  PostgreSQL (primary + replica)
-                 ↓
-           scan workers (Deployment, consumes a real queue)
+```mermaid
+flowchart TB
+    ING[ingress / TLS] --> API1["festin API pod 1"]
+    ING --> API2["festin API pod 2"]
+    ING --> APIN["festin API pod N"]
+    API1 & API2 & APIN --> PG[(PostgreSQL<br/>primary + replica)]
+    API1 & API2 & APIN -->|enqueue| REDIS[(Redis<br/>Streams)]
+    REDIS --> W1["festin-worker 1"]
+    REDIS --> W2["festin-worker 2"]
+    W1 & W2 --> PG
 ```
 
-- `FESTIN_DB_DSN=postgres://...` selects the asyncpg backend — done.
-- Queue: `FESTIN_QUEUE=streaq` moves scan execution to Redis Streams consumers — done.
-- Then: HPA on API replicas, `RollingUpdate`, per-day findings in a real DB.
+### Why this works
 
-Tracked as a design goal in [ADR #2](../reference/design-decisions.md).
+- **Stateless API**: JWT auth + PG-backed state → any replica serves any
+  request. Scale with HPA; use `RollingUpdate`.
+- **Durable queue**: `FESTIN_QUEUE=streaq` — the API only *enqueues*; a
+  dead API pod loses nothing, the job sits in Redis until a worker picks
+  it up.
+- **Independent scanning capacity**: run 1..N `festin-worker` Deployments
+  against the same Redis. Workers own their DB connections
+  (`FESTIN_DB_DSN`).
+- **Watchdog** (`scan_timeout`, default 600 s): a worker that dies
+  mid-scan leaves the row `running`; the API scheduler loop reaps it to
+  `failed` after the timeout. With workers separated, the API always
+  stays alive to reap.
+- **Fallback safety**: if Redis is unreachable at startup, the API falls
+  back to memory mode (logs an error) — degraded but never down.
 
-### Pattern 4 — Splitting the scanner <span class="chip chip-info">RECOMMENDED FOR SCALE</span>
+### Concrete Kubernetes pieces
 
-The scanner is the heavy part. Scale it independently of the UI:
+=== "API Deployment (N replicas)"
 
-- Keep 1 dashboard replica (UI + state).
-- Run scans as **Kubernetes CronJobs / external workers** calling `POST /scans/run-scan` or writing via the API.
-- The service already treats scans as async tasks — replacing the in-process executor with a queue consumer is the one integration point (see [architecture](../reference/architecture.md#scaling-story)).
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: festin-api
+    spec:
+      replicas: 2                      # safe with PG: no shared volume
+      strategy: {type: RollingUpdate}  # no volume overlap anymore
+      template:
+        spec:
+          containers:
+            - name: festin
+              image: cr0hn/festin:latest
+              args: ["serve", "--host", "0.0.0.0"]
+              env:
+                - name: FESTIN_DB_DSN
+                  valueFrom:
+                    secretKeyRef: {name: festin-secrets, key: db-dsn}
+                - name: FESTIN_JWT_SECRET
+                  valueFrom:
+                    secretKeyRef: {name: festin-secrets, key: jwt-secret}
+                - name: FESTIN_QUEUE
+                  value: streaq
+                - name: FESTIN_REDIS_URL
+                  value: redis://redis:6379/0
+                - name: FESTIN_RATE_LIMIT_ATTEMPTS
+                  value: "5"
+    ```
+
+=== "Worker Deployment (scale scans)"
+
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: festin-worker
+    spec:
+      replicas: 2                      # scan throughput knob
+      template:
+        spec:
+          containers:
+            - name: worker
+              image: cr0hn/festin:0.4.0
+              command: ["festin-worker"]
+              env:
+                - name: FESTIN_DB_DSN
+                  valueFrom:
+                    secretKeyRef: {name: festin-secrets, key: db-dsn}
+                - name: FESTIN_REDIS_URL
+                  value: redis://redis:6379/0
+          # no web port: workers only consume
+    ```
+
+=== "PostgreSQL (CloudNativePG or managed)"
+
+    ```yaml
+    # Recommended: CloudNativePG operator
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: festin-pg
+    spec:
+      instances: 2          # primary + replica
+      storage: {size: 10Gi}
+      # DSN for the app: postgres://festin:<pass>@festin-pg-rw:5432/festin
+    ```
+
+    Or use your cloud's managed Postgres — set `FESTIN_DB_DSN` to its DSN
+    and you're done.
+
+## Topology 3 — Read replicas with SQLite <span class="chip chip-warn">NICHE</span>
+
+Only if you stay on SQLite AND read traffic is high:
+
+- N replicas serve UI + reads from a read-only SQLite copy (Litestream
+  tail or WAL streaming).
+- One active instance owns mutations + scheduler.
+- Proxy routes `POST/DELETE/PATCH` to the active; `GET` anywhere.
+- Requires the small scheduler-disable patch. Use Topology 2 instead —
+  less moving parts for the same result.
 
 ## Anti-patterns (do not do)
 
 | Anti-pattern | Why it breaks |
 |---|---|
 | `replicas: 2` with the same RWO SQLite volume | second pod can't mount the volume / corrupts on RWX |
-| Rolling update (`RollingUpdate`) | old+new pod overlap on one SQLite file |
-| Two schedulers on one schedule table | double scans (no distributed lock) |
-| Backing up with `cp` on a live DB | mid-write corruption; use `.backup` |
+| Rolling update on a SQLite deployment | old+new pod overlap on one file — use `Recreate` |
+| Two schedulers on one schedule table | double scans (no distributed lock) — scheduler runs only with SQLite topology |
+| Backing up with `cp` on a live DB | mid-write corruption; use `.backup` / PG dumps |
+| `FESTIN_QUEUE=streaq` with zero `festin-worker` processes | jobs pile up in Redis forever (they don't run) |
 
 ## Decision matrix
 
 | Need | Choose |
 |---|---|
-| "Server reboots without losing data" | Pattern 1 (already have it) |
-| "Read traffic is high, writes are few" | Pattern 2 (read replicas) |
-| "Multiple writers / true HA" | Pattern 3 (Postgres + queue) — requires dev work |
-| "More scanning throughput" | Pattern 4 (external workers) — works today |
+| "Single server, occasional reboots" | Topology 1 (SQLite) — simplest |
+| "True HA, N API replicas, durable scans" | Topology 2 (PostgreSQL + streaQ) — shipped in 0.4.0 |
+| "Heavy scanning, light UI" | Topology 2 + more worker replicas |
+| "Must stay on SQLite" | Topology 1, accept single-writer |
+
+## Operational checklist (production)
+
+- [ ] `FESTIN_JWT_SECRET` random, from a secret store
+- [ ] `FESTIN_DB_DSN` set (Postgres) **and** PG backups automated
+- [ ] `FESTIN_QUEUE=streaq` + ≥1 `festin-worker` running + Redis monitored
+- [ ] `/api/v1/health` wired to uptime monitoring on every API replica
+- [ ] Worker crash = jobs stay queued → alert on queue depth (Redis
+      `XLEN` on the streaq stream), not just pod status
+- [ ] `scan_timeout` tuned: > your longest expected scan
+- [ ] Rate limits tuned (`FESTIN_RATE_LIMIT_*`) — plus proxy-level limiting
 
 [ok]: https://img.shields.io/badge/-ok-7bd88f "ok"

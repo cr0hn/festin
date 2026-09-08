@@ -24,7 +24,7 @@ FestIn finds exposure — don't let the dashboard become one.
 - [ ] **Delete the demo database** (`rm data/festin.db`) — the checked-in one has known credentials (`admin/admin123`).
 - [ ] **Strong bootstrap password.** The first registered user becomes admin; register it yourself before exposing the service.
 - [ ] **TLS everywhere.** Terminate at your proxy/ingress; the service speaks plain HTTP ([docker](docker.md#reverse-proxy-tls)).
-- [ ] **Rate-limit `/api/v1/auth/login`** at the proxy. In-app rate limiting is not implemented:
+- [ ] **Second-layer rate limit at the proxy.** Login/register are limited in-app (5 attempts / 60 s per IP, env-tunable — see [configuration](../usage/configuration.md)); a proxy limit is still worth it as defense in depth:
 
     ```nginx
     # nginx: 5 req/min per IP on login

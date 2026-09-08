@@ -148,9 +148,12 @@ spec:
               persistentVolumeClaim: {claimName: festin-reports}
 ```
 
-## Why `replicas: 1` and `strategy: Recreate`
+## Why `replicas: 1` and `strategy: Recreate` (SQLite topology)
 
-The dashboard state lives in SQLite on a `ReadWriteOnce` volume. Two pods
-can't share it, and a rolling update would overlap old/new pods on the same
-claim. [HA](ha.md) covers the supported scaling paths (read-replica UI,
-Postgres, external scheduler).
+The manifest above keeps SQLite on a `ReadWriteOnce` volume: two pods can't
+share it and a rolling update would overlap pods on the same claim.
+
+**For multi-replica production, switch to PostgreSQL + streaQ** — set
+`FESTIN_DB_DSN`, `FESTIN_QUEUE=streaq`, run `festin-worker` Deployments,
+then raise `replicas` and use `RollingUpdate` freely. Full walkthrough:
+[high availability](ha.md#topology-2--postgresql--streaq-workers-production).
